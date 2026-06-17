@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESL Adaptive Learning Sandbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .json-inspector {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center text-blue-600">ESL Adaptive Learning Sandbox</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- State Simulator Panel -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">1. State Simulator</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Current Estimated Level</label>
+                        <select id="currentLevel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+                            <option value="A1-Sub1">A1-Sub1</option>
+                            <option value="A1-Sub2">A1-Sub2</option>
+                            <option value="A1-Sub3">A1-Sub3</option>
+                            <option value="A1-Sub4">A1-Sub4</option>
+                            <option value="B1-Sub1">B1-Sub1</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Covered Categories (JSON)</label>
+                        <textarea id="coveredCategories" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">{}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">X-App-Token</label>
+                        <input type="text" id="appToken" value="super-secret-token" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interview Chat Sandbox -->
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[600px]">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">2. Interview Chat</h2>
+                <div id="chatBox" class="flex-grow overflow-y-auto mb-4 space-y-2 p-2 bg-gray-50 rounded border">
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="chatInput" placeholder="Type as the child..." class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border">
+                    <button onclick="sendChatMessage()" id="sendBtn" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Send</button>
+                </div>
+                <div id="pedagogicalPayload" class="mt-4 hidden">
+                    <h3 class="text-sm font-bold text-green-600 mb-1 uppercase">Final Decision Applied!</h3>
+                    <div id="decisionJson" class="json-inspector"></div>
+                </div>
+            </div>
+
+            <!-- Scene Generation Sandbox -->
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[600px]">
+                <h2 class="text-xl font-semibold mb-4 border-b pb-2">3. Scene Generation</h2>
+                <div class="space-y-4 mb-4">
+                    <button onclick="generateScene()" id="genSceneBtn" class="w-full bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 disabled:opacity-50">Generate Next Scene</button>
+                </div>
+                <div id="sceneOutput" class="flex-grow overflow-y-auto space-y-4 p-2 bg-gray-50 rounded border hidden">
+                    <div>
+                        <h3 class="font-bold">Story Text (English):</h3>
+                        <p id="storyText" class="text-gray-800 italic"></p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">Remedial Text (Hebrew):</h3>
+                        <p id="remedialText" class="text-gray-800"></p>
+                    </div>
+                    <div>
+                        <h3 class="font-bold">Full JSON:</h3>
+                        <div id="sceneJson" class="json-inspector"></div>
+                    </div>
+                </div>
+                <div id="scenePlaceholder" class="flex-grow flex items-center justify-center text-gray-400 italic">
+                    Generate a scene to see results
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let chatHistory = [];
+        let currentPedagogicalDecision = null;
+
+        async function apiCall(endpoint, body) {
+            const token = document.getElementById('appToken').value;
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': token
+                },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                alert(`Error: ${err.detail || response.statusText}`);
+                throw new Error(err.detail);
+            }
+            return await response.json();
+        }
+
+        function appendMessage(role, content) {
+            const chatBox = document.getElementById('chatBox');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `p-2 rounded-lg ${role === 'user' ? 'bg-blue-100 ml-8' : 'bg-gray-200 mr-8'}`;
+            msgDiv.innerHTML = `<strong>${role === 'user' ? 'Child' : 'AI'}:</strong> ${content}`;
+            chatBox.appendChild(msgDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendMessage('user', text);
+            input.value = '';
+            
+            const studentState = {
+                current_estimated_level: document.getElementById('currentLevel').value,
+                covered_categories: JSON.parse(document.getElementById('coveredCategories').value || '{}')
+            };
+
+            try {
+                const data = await apiCall('/interview-chat', {
+                    message: text,
+                    history: chatHistory,
+                    student_state: studentState
+                });
+
+                if (data.is_final_turn) {
+                    appendMessage('ai', "I've decided on your next lesson!");
+                    document.getElementById('pedagogicalPayload').classList.remove('hidden');
+                    document.getElementById('decisionJson').innerText = JSON.stringify(data.pedagogical_decision, null, 2);
+                    currentPedagogicalDecision = data.pedagogical_decision;
+                    document.getElementById('currentLevel').value = data.pedagogical_decision.updated_level;
+                } else {
+                    appendMessage('ai', data.chat_response);
+                    chatHistory.push({role: 'user', content: text});
+                    chatHistory.push({role: 'model', content: data.chat_response});
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function generateScene() {
+            if (!currentPedagogicalDecision) {
+                alert("Please complete the interview chat first.");
+                return;
+            }
+
+            const btn = document.getElementById('genSceneBtn');
+            btn.disabled = true;
+            btn.innerText = "Generating...";
+
+            try {
+                const studentState = {
+                    current_estimated_level: document.getElementById('currentLevel').value,
+                    covered_categories: JSON.parse(document.getElementById('coveredCategories').value || '{}')
+                };
+
+                const data = await apiCall('/generate-scene', {
+                    category: currentPedagogicalDecision.category_name,
+                    target_words: currentPedagogicalDecision.target_words,
+                    plot_history: [],
+                    student_state: studentState
+                });
+
+                document.getElementById('scenePlaceholder').classList.add('hidden');
+                document.getElementById('sceneOutput').classList.remove('hidden');
+                document.getElementById('storyText').innerText = data.scene_text;
+                document.getElementById('remedialText').innerText = data.remedial_scene_text;
+                document.getElementById('sceneJson').innerText = JSON.stringify(data, null, 2);
+
+            } catch (e) {
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Generate Next Scene";
+            }
+        }
+    </script>
+</body>
+</html>
