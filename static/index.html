@@ -13,23 +13,24 @@
             font-family: monospace;
             white-space: pre-wrap;
             font-size: 0.8rem;
-            max-height: 200px;
+            max-height: 150px;
             overflow-y: auto;
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen p-8">
+<body class="bg-gray-100 min-h-screen p-4">
     <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-bold mb-8 text-center text-blue-600">StoryVoyage Adaptive Learning Sandbox</h1>
+        <h1 class="text-2xl font-bold mb-4 text-center text-blue-600">StoryVoyage Adaptive Learning Sandbox</h1>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
             <!-- 1. State Simulator Panel -->
-            <div class="bg-white p-6 rounded-lg shadow-md lg:col-span-1">
-                <h2 class="text-xl font-semibold mb-4 border-b pb-2">1. Student State</h2>
-                <div class="space-y-4">
+            <div class="bg-white p-4 rounded-lg shadow-md lg:col-span-1">
+                <h2 class="text-lg font-semibold mb-2 border-b pb-1">1. Student State</h2>
+                <div class="space-y-3">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Current Level</label>
-                        <select id="currentLevel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border text-sm">
+                        <label class="block text-xs font-medium text-gray-700">Current Level</label>
+                        <select id="currentLevel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50 p-1 border text-sm">
+                            <option value="unknown">Unknown (Assess Me)</option>
                             <option value="A1-Sub1">A1-Sub1</option>
                             <option value="A1-Sub2">A1-Sub2</option>
                             <option value="A1-Sub3">A1-Sub3</option>
@@ -38,75 +39,64 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">History (JSON)</label>
-                        <textarea id="assessmentHistory" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border text-xs">[]</textarea>
+                        <label class="block text-xs font-medium text-gray-700">Plot History</label>
+                        <textarea id="plotHistory" rows="3" class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 p-1 border text-xs" readonly>[]</textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Preferences (JSON)</label>
-                        <textarea id="storyPreferences" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border text-xs">{"hero_name": "Leo", "theme": "Space"}</textarea>
+                        <label class="block text-xs font-medium text-gray-700">Preferences (JSON)</label>
+                        <textarea id="storyPreferences" rows="2" class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 p-1 border text-xs">{"hero_name": "Leo", "theme": "Space"}</textarea>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">X-App-Token</label>
-                        <input type="text" id="appToken" value="super-secret-token" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border text-sm">
+                        <label class="block text-xs font-medium text-gray-700">X-App-Token</label>
+                        <input type="text" id="appToken" value="super-secret-token" class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 p-1 border text-sm">
                     </div>
+                    <button onclick="resetStory()" class="w-full bg-red-500 text-white py-1 rounded text-xs">Reset Story</button>
                 </div>
             </div>
 
             <!-- 2. Interview/Setup Sandbox -->
-            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[650px] lg:col-span-1">
-                <h2 class="text-xl font-semibold mb-4 border-b pb-2">2. Story Setup (Hebrew)</h2>
-                <div id="chatBox" class="flex-grow overflow-y-auto mb-4 space-y-2 p-2 bg-gray-50 rounded border text-sm">
-                    <div class="p-2 rounded-lg bg-gray-200 mr-8 italic text-gray-600">Start by saying "Hi" or "שלום" to build your story!</div>
+            <div class="bg-white p-4 rounded-lg shadow-md flex flex-col h-[600px] lg:col-span-1">
+                <h2 class="text-lg font-semibold mb-2 border-b pb-1">2. Story Setup</h2>
+                <div id="chatBox" class="flex-grow overflow-y-auto mb-2 space-y-2 p-2 bg-gray-50 rounded border text-sm italic">
+                    <div class="p-2 rounded-lg bg-gray-200">Say "שלום" to start!</div>
                 </div>
-                <div class="flex gap-2">
-                    <input type="text" id="chatInput" placeholder="Type in Hebrew/English..." class="flex-grow rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-gray-50 p-2 border text-sm">
-                    <button onclick="sendChatMessage()" id="sendBtn" class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 text-sm">Send</button>
+                <div class="flex gap-1">
+                    <input type="text" id="chatInput" placeholder="Hebrew/English..." class="flex-grow rounded-md border-gray-300 bg-gray-50 p-1 border text-sm">
+                    <button onclick="sendChatMessage()" id="sendBtn" class="bg-blue-500 text-white px-3 py-1 rounded-md text-sm">Send</button>
                 </div>
-                <div id="pedagogicalPayload" class="mt-4 hidden border-t pt-2">
-                    <h3 class="text-xs font-bold text-green-600 mb-1 uppercase italic">Setup Complete!</h3>
+                <div id="pedagogicalPayload" class="mt-2 hidden border-t pt-1">
+                    <h3 class="text-xs font-bold text-green-600 mb-1">Setup Done!</h3>
                     <div id="decisionJson" class="json-inspector"></div>
                 </div>
             </div>
 
             <!-- 3. Scene & Assessment Sandbox -->
-            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[650px] lg:col-span-2">
-                <h2 class="text-xl font-semibold mb-4 border-b pb-2">3. Scene & Assessment</h2>
+            <div class="bg-white p-4 rounded-lg shadow-md flex flex-col h-[600px] lg:col-span-2">
+                <h2 class="text-lg font-semibold mb-2 border-b pb-1">3. The Adventure</h2>
 
-                <div class="flex gap-4 mb-4">
-                    <button onclick="generateScene()" id="genSceneBtn" class="flex-1 bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 disabled:opacity-50 text-sm">Generate Scene</button>
-                    <button onclick="evaluateAssessment()" id="evalBtn" class="flex-1 bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 disabled:opacity-50 text-sm hidden">Evaluate Answers</button>
+                <div id="sceneActionArea" class="mb-2">
+                    <button onclick="generateScene(null)" id="genSceneBtn" class="w-full bg-purple-500 text-white py-2 rounded-md hover:bg-purple-600 disabled:opacity-50 text-sm">Start Adventure</button>
                 </div>
 
-                <div id="sceneOutput" class="flex-grow overflow-y-auto space-y-4 p-2 bg-gray-50 rounded border hidden">
-                    <div class="border-b pb-2">
-                        <h3 class="font-bold text-sm text-purple-700">English Scene:</h3>
-                        <p id="storyText" class="text-gray-800 italic text-sm"></p>
-                    </div>
-                    <div class="border-b pb-2">
-                        <h3 class="font-bold text-sm text-blue-700">Hebrew Remedial:</h3>
+                <div id="sceneOutput" class="flex-grow overflow-y-auto space-y-3 p-2 bg-gray-50 rounded border hidden">
+                    <div id="storyContent">
+                        <h3 class="font-bold text-sm text-purple-700">English:</h3>
+                        <p id="storyText" class="text-gray-800 italic text-sm mb-2"></p>
+                        <h3 class="font-bold text-sm text-blue-700">Hebrew:</h3>
                         <p id="remedialText" class="text-gray-800 text-sm"></p>
                     </div>
 
-                    <div id="assessmentSection" class="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <h3 class="font-bold text-sm mb-2">Interactive Tasks (Simulated):</h3>
-                        <div id="tasksContent" class="space-y-3 text-sm">
-                            <!-- Questions will be injected here -->
-                        </div>
+                    <div id="assessmentSection" class="bg-yellow-50 p-2 rounded border border-yellow-200">
+                        <div id="tasksContent" class="space-y-2 text-sm"></div>
+                        <button onclick="evaluateAssessment()" id="evalBtn" class="mt-2 w-full bg-green-500 text-white py-1 rounded text-sm">Check Answer</button>
                     </div>
 
-                    <div id="feedbackSection" class="bg-green-50 p-3 rounded border border-green-200 hidden">
-                        <h3 class="font-bold text-sm mb-1">Pedagogical Feedback:</h3>
-                        <p id="feedbackText" class="text-sm italic mb-2"></p>
-                        <div id="feedbackJson" class="json-inspector"></div>
+                    <div id="branchSection" class="hidden border-t pt-2">
+                        <h3 class="font-bold text-sm mb-2 text-red-600">What happens next?</h3>
+                        <div id="branchButtons" class="flex flex-col gap-2"></div>
                     </div>
 
-                    <div>
-                        <h3 class="font-bold text-xs text-gray-500">Raw Scene JSON:</h3>
-                        <div id="sceneJson" class="json-inspector"></div>
-                    </div>
-                </div>
-                <div id="scenePlaceholder" class="flex-grow flex items-center justify-center text-gray-400 italic text-sm">
-                    Complete the Setup first, then generate a scene.
+                    <div id="feedbackSection" class="bg-green-50 p-2 rounded border border-green-200 hidden text-sm italic"></div>
                 </div>
             </div>
         </div>
@@ -116,15 +106,14 @@
         let chatHistory = [];
         let lastDecision = null;
         let lastSceneData = null;
+        let plotHistory = [];
+        let sceneCount = 0;
 
         async function apiCall(endpoint, body) {
             const token = document.getElementById('appToken').value;
             const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-App-Token': token
-                },
+                headers: { 'Content-Type': 'application/json', 'X-App-Token': token },
                 body: JSON.stringify(body)
             });
             if (!response.ok) {
@@ -139,17 +128,17 @@
             return {
                 current_estimated_level: document.getElementById('currentLevel').value,
                 covered_categories: {},
-                assessment_history: JSON.parse(document.getElementById('assessmentHistory').value || '[]'),
+                assessment_history: [],
                 story_preferences: JSON.parse(document.getElementById('storyPreferences').value || '{}'),
-                total_scenes_completed: 0
+                total_scenes_completed: sceneCount
             };
         }
 
         function appendMessage(role, content) {
             const chatBox = document.getElementById('chatBox');
             const msgDiv = document.createElement('div');
-            msgDiv.className = `p-2 rounded-lg ${role === 'user' ? 'bg-blue-100 ml-8' : 'bg-gray-200 mr-8'}`;
-            msgDiv.innerHTML = `<strong>${role === 'user' ? 'Child' : 'AI'}:</strong> ${content}`;
+            msgDiv.className = `p-2 rounded-lg ${role === 'user' ? 'bg-blue-100 ml-4' : 'bg-gray-200 mr-4'}`;
+            msgDiv.innerHTML = content;
             chatBox.appendChild(msgDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
@@ -170,7 +159,7 @@
                 });
 
                 if (data.is_final_turn) {
-                    appendMessage('ai', "מצוין! בניתי לנו סיפור מדהים. בוא נתחיל!");
+                    appendMessage('ai', "<b>מצוין! בניתי לנו סיפור. בוא נתחיל!</b>");
                     document.getElementById('pedagogicalPayload').classList.remove('hidden');
                     document.getElementById('decisionJson').innerText = JSON.stringify(data.pedagogical_decision, null, 2);
                     lastDecision = data.pedagogical_decision;
@@ -183,100 +172,89 @@
             } catch (e) { console.error(e); }
         }
 
-        async function generateScene() {
-            if (!lastDecision) {
-                alert("Please complete the Story Setup first.");
-                return;
-            }
+        async function generateScene(branchId = null) {
+            if (!lastDecision) return alert("Complete Setup first!");
 
             const btn = document.getElementById('genSceneBtn');
             btn.disabled = true;
             btn.innerText = "Generating...";
+
             document.getElementById('feedbackSection').classList.add('hidden');
+            document.getElementById('branchSection').classList.add('hidden');
 
             try {
                 const data = await apiCall('/generate-scene', {
                     category: lastDecision.category_name,
                     target_words: lastDecision.target_words,
-                    plot_history: [],
+                    plot_history: plotHistory,
+                    selected_branch_id: branchId,
                     student_state: getStudentState(),
                     story_elements: lastDecision.story_elements
                 });
 
                 lastSceneData = data;
-                document.getElementById('scenePlaceholder').classList.add('hidden');
+                sceneCount++;
+                plotHistory.push(data.scene_text);
+                document.getElementById('plotHistory').value = JSON.stringify(plotHistory, null, 2);
+
                 document.getElementById('sceneOutput').classList.remove('hidden');
                 document.getElementById('storyText').innerText = data.scene_text;
                 document.getElementById('remedialText').innerText = data.remedial_scene_text;
-                document.getElementById('sceneJson').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('genSceneBtn').classList.add('hidden');
 
-                // Show simulated questions
+                // Tasks
                 const tasks = data.assessment_tasks;
                 document.getElementById('tasksContent').innerHTML = `
                     <div class="p-2 border rounded bg-white">
-                        <p class="font-semibold">Q1: ${tasks.comprehension_question.question_text_hebrew}</p>
-                        <div class="pl-4 mt-1">
-                            ${tasks.comprehension_question.options_hebrew.map((opt, i) => `
-                                <label class="block"><input type="radio" name="q1" value="${i}"> ${opt}</label>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="p-2 border rounded bg-white">
-                        <p class="font-semibold">Cloze: ${tasks.cloze_task.sentence_with_blank}</p>
-                        <p class="text-xs text-gray-500">(Translation: ${tasks.cloze_task.translation_of_blank_word_hebrew})</p>
-                        <div class="pl-4 mt-1">
-                            ${tasks.cloze_task.options.map((opt, i) => `
-                                <label class="block"><input type="radio" name="q2" value="${i}"> ${opt}</label>
-                            `).join('')}
-                        </div>
+                        <p class="font-semibold mb-1">${tasks.comprehension_question.question_text_hebrew}</p>
+                        ${tasks.comprehension_question.options_hebrew.map((opt, i) => `
+                            <label class="block"><input type="radio" name="q1" value="${i}"> ${opt}</label>
+                        `).join('')}
                     </div>
                 `;
-                document.getElementById('evalBtn').classList.remove('hidden');
+                document.getElementById('assessmentSection').classList.remove('hidden');
 
             } catch (e) { console.error(e); }
-            finally {
-                btn.disabled = false;
-                btn.innerText = "Generate Scene";
-            }
+            finally { btn.disabled = false; btn.innerText = "Start Adventure"; }
         }
 
         async function evaluateAssessment() {
             const q1 = document.querySelector('input[name="q1"]:checked')?.value;
-            const q2 = document.querySelector('input[name="q2"]:checked')?.value;
-
-            if (q1 === undefined || q2 === undefined) {
-                alert("Please answer both questions first!");
-                return;
-            }
-
-            const btn = document.getElementById('evalBtn');
-            btn.disabled = true;
+            if (q1 === undefined) return alert("Answer the question!");
 
             try {
-                const submission = {
+                const feedback = await apiCall('/evaluate-assessment', {
                     student_state: getStudentState(),
                     category: lastDecision.category_name,
                     level: document.getElementById('currentLevel').value,
-                    answers: { q1: parseInt(q1), q2: parseInt(q2) },
-                    correct_answers: {
-                        q1: lastSceneData.assessment_tasks.comprehension_question.correct_option_index,
-                        q2: lastSceneData.assessment_tasks.cloze_task.correct_option_index
-                    }
-                };
-
-                const feedback = await apiCall('/evaluate-assessment', submission);
+                    answers: { q1: parseInt(q1) },
+                    correct_answers: { q1: lastSceneData.assessment_tasks.comprehension_question.correct_option_index }
+                });
 
                 document.getElementById('feedbackSection').classList.remove('hidden');
-                document.getElementById('feedbackText').innerText = feedback.encouragement_message_hebrew + " " + feedback.explanation_hebrew;
-                document.getElementById('feedbackJson').innerText = JSON.stringify(feedback, null, 2);
+                document.getElementById('feedbackSection').innerText = feedback.explanation_hebrew;
+                document.getElementById('assessmentSection').classList.add('hidden');
 
-                // Update state simulator if suggested
-                if (feedback.suggested_state_updates.current_estimated_level) {
-                    document.getElementById('currentLevel').value = feedback.suggested_state_updates.current_estimated_level;
-                }
+                // Show Branches
+                document.getElementById('branchSection').classList.remove('hidden');
+                document.getElementById('branchButtons').innerHTML = lastSceneData.story_branches.map(b => `
+                    <button onclick="generateScene(${b.choice_id})" class="bg-blue-100 hover:bg-blue-200 border border-blue-300 p-2 rounded text-xs text-left">
+                        <b>${b.text_english}</b><br><span class="text-gray-600">${b.text_hebrew}</span>
+                    </button>
+                `).join('');
 
             } catch (e) { console.error(e); }
-            finally { btn.disabled = false; }
+        }
+
+        function resetStory() {
+            plotHistory = [];
+            sceneCount = 0;
+            document.getElementById('plotHistory').value = "[]";
+            document.getElementById('sceneOutput').classList.add('hidden');
+            document.getElementById('genSceneBtn').classList.remove('hidden');
+            document.getElementById('chatBox').innerHTML = '<div class="p-2 rounded-lg bg-gray-200">Say "שלום" to start!</div>';
+            chatHistory = [];
+            lastDecision = null;
         }
     </script>
 </body>

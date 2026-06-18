@@ -18,7 +18,7 @@ class StoryPreferences(BaseModel):
     avoid_topics: List[str] = Field(default_factory=list)
 
 class StudentState(BaseModel):
-    current_estimated_level: str = Field(..., example="A1-Sub1")
+    current_estimated_level: str = Field(..., example="A1-Sub1", description="Level like A1-Sub1 or 'unknown'")
     covered_categories: Dict[str, str] = Field(default_factory=dict, description="e.g., {'space_objects': 'completed'}")
     assessment_history: List[AssessmentRecord] = Field(default_factory=list)
     story_preferences: StoryPreferences = Field(default_factory=StoryPreferences)
@@ -72,6 +72,7 @@ class GenerateSceneRequest(BaseModel):
     category: str
     target_words: List[str]
     plot_history: List[str] = Field(default_factory=list)
+    selected_branch_id: Optional[int] = None
     student_state: StudentState
     story_elements: Optional[StoryElements] = None
 
