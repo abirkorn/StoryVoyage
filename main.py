@@ -39,6 +39,10 @@ async def interview_chat(request: models.InterviewChatRequest, token: str = Depe
 async def generate_scene(request: models.GenerateSceneRequest, token: str = Depends(verify_token)):
     return llm_service.generate_story_scene(request)
 
+@app.post("/evaluate-assessment", response_model=models.AssessmentFeedback)
+async def evaluate_assessment(submission: models.AssessmentSubmission, token: str = Depends(verify_token)):
+    return llm_service.evaluate_assessment_performance(submission)
+
 @app.post("/generate-exam", response_model=models.ExamResponse)
 async def generate_exam(request: models.GenerateExamRequest, token: str = Depends(verify_token)):
     return llm_service.generate_cefr_exam(request)
