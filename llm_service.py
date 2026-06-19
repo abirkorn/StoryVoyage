@@ -16,41 +16,19 @@ def get_client():
 
 def generate_interview_response(request: models.InterviewChatRequest) -> models.InterviewChatResponse:
     client = get_client()
-    """
-    Handles 'Story Setup' & Assessment.
-    If level is unknown, AI MUST assess English level with 1-2 simple questions.
-    """
-    
     system_prompt = f"""
-    Expert ESL Pedagogical Assistant.
-    Task: Build a story with a child in HEBREW and assess their English level.
-    
-    CONTEXT:
-    - Level: {request.student_state.current_estimated_level}
-    - History: {len(request.history)} turns.
-    
+    Expert ESL Pedagogical Assistant. Build a story with a child in HEBREW and assess their English level.
+    CONTEXT: Level: {request.student_state.current_estimated_level}
     INSTRUCTIONS:
-    1. If Level is 'unknown': You MUST ask 1-2 very simple English questions (e.g. 'Do you know what "Dog" means?') to gauge proficiency.
+    1. If Level is 'unknown': Ask 1 simple English check question.
     2. Narrow elements: Hero, Setting, Goal.
     3. Conclude after 3-4 turns with JSON.
-    4. Be brief (token-efficient).
-    
-    JSON FORMAT:
-    {{
-        "pedagogical_decision": {{
-            "category_name": "string",
-            "target_words": ["w1", "w2", "w3", "w4", "w5", "w6"],
-            "updated_level": "A1-Sub1/2/3/4",
-            "story_elements": {{"hero_name": "str", "setting": "str", "initial_plot_point": "str"}}
-        }}
-    }}
     """
     
     contents = [types.Content(role="user", parts=[types.Part(text=system_prompt)])]
     for msg in request.history:
         role = "model" if msg.role == "model" else "user"
         contents.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
-    
     contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
     
     response = client.models.generate_content(
@@ -59,14 +37,12 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
     )
     
     text = response.text.strip()
-    
     try:
         json_text = text
         if "```json" in text:
             json_text = text.split("```json")[1].split("```")[0].strip()
         elif "{" in text:
             json_text = text[text.find("{"):text.rfind("}")+1]
-            
         data = json.loads(json_text)
         decision_data = data.get("pedagogical_decision", data)
         if "category_name" in decision_data:
@@ -79,18 +55,74 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
                 ),
                 is_final_turn=True
             )
-    except:
-        pass
-        
+    except: pass
     return models.InterviewChatResponse(chat_response=text, is_final_turn=False)
+
+def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
+    """Step 1: Generate the high-level 5-act story blueprint."""
+    client = get_client()
+    system_prompt = f"""
+    ESL Story Architect. Generate a 5-act dramatic story arc blueprint for a child.
+
+    ELEMENTS:
+    - Hero: {request.story_elements.hero_name}
+    - Setting: {request.story_elements.setting}
+    - Goal: {request.story_elements.goal}
+    - CEFR Level: {request.student_state.current_estimated_level}
+    - Genre/Theme: {request.genre_theme or "Adventure"}
+
+    OUTPUT:
+    A strict JSON matching the StoryArc schema.
+    Define 5 acts: Introduction, Inciting Incident, Rising Action, Climax, Resolution.
+    Each act needs a title and a brief description.
+    """
+
+    response = client.models.generate_content(
+        model=SCENE_MODEL_ID,
+        contents=system_prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=models.StoryArc,
+        )
+    )
+    return response.parsed
+
+def generate_act_content(request: models.ActContentRequest) -> models.ActContentResponse:
+    """Step 2: Generate the prose and assessment for a specific act."""
+    client = get_client()
+    act = next((a for a in request.story_arc.acts if a.act_number == request.act_number), None)
+
+    system_prompt = f"""
+    ESL Story Writer. Write the prose for Act {request.act_number}: {act.title if act else 'Next Act'}.
+    
+    STORY ARC CONTEXT:
+    - Overall Arc: {request.story_arc.story_title}
+    - Current Act Goal: {act.description if act else ''}
+    - CEFR Level: {request.student_state.current_estimated_level}
+    - Target Words to weave in: {", ".join(request.target_words)}
+    
+    REQUIREMENTS:
+    1. scene_text: Simple English prose for the act.
+    2. remedial_scene_text: Hebrew translation.
+    3. vocabulary_definitions: Dictionary of target words and their Hebrew meaning.
+    4. assessment_tasks: 1 comprehension (HE), 1 cloze (EN).
+    5. story_branches: 2-3 branches for how the story might transition slightly.
+    """
+    
+    response = client.models.generate_content(
+        model=SCENE_MODEL_ID,
+        contents=system_prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=models.ActContentResponse,
+        )
+    )
+    return response.parsed
 
 def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> models.AssessmentFeedback:
     client = get_client()
     num_correct = sum(1 for k in submission.answers if submission.answers[k] == submission.correct_answers.get(k))
-    total_questions = len(submission.correct_answers)
-
-    prompt = f"Score: {num_correct}/{total_questions}. Level: {submission.level}. Briefly give Hebrew feedback and level update (JSON)."
-
+    prompt = f"Score: {num_correct}/{len(submission.correct_answers)}. Give Hebrew feedback (JSON)."
     response = client.models.generate_content(
         model=SCENE_MODEL_ID,
         contents=prompt,
@@ -101,40 +133,9 @@ def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> 
     )
     return response.parsed
 
-def generate_story_scene(request: models.GenerateSceneRequest) -> models.SceneResponse:
-    client = get_client()
-    
-    system_prompt = f"""
-    ESL Storyteller. Level: {request.student_state.current_estimated_level}.
-    Hero: {request.story_elements.hero_name if request.story_elements else 'Hero'}
-    Setting: {request.story_elements.setting if request.story_elements else 'Setting'}
-    
-    HISTORY: {json.dumps(request.plot_history)}
-    CHOICE MADE: Branch {request.selected_branch_id if request.selected_branch_id is not None else 'None (Start)'}
-    
-    REQUIREMENTS:
-    1. Continue the story based on the choice.
-    2. Include words: {", ".join(request.target_words)}
-    3. Output strict JSON (SceneResponse).
-    4. scene_text (EN), remedial_scene_text (HE).
-    5. assessment_tasks: 1 comprehension (HE), 1 cloze (EN).
-    6. story_branches: 2-3 choices (EN/HE).
-    """
-    
-    response = client.models.generate_content(
-        model=SCENE_MODEL_ID,
-        contents=system_prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.SceneResponse,
-        )
-    )
-    return response.parsed
-
 def generate_cefr_exam(request: models.GenerateExamRequest) -> models.ExamResponse:
     client = get_client()
-    prompt = f"Generate CEFR {request.cefr_level} exam (5 questions) in Hebrew based on: {json.dumps(request.scenes_data)}. JSON output."
-    
+    prompt = f"Generate CEFR {request.cefr_level} exam in Hebrew. JSON."
     response = client.models.generate_content(
         model=EXAM_MODEL_ID,
         contents=prompt,

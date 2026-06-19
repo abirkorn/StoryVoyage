@@ -38,7 +38,7 @@ class InterviewChatRequest(BaseModel):
 class StoryElements(BaseModel):
     hero_name: str
     setting: str
-    initial_plot_point: str
+    goal: str
 
 class PedagogicalDecision(BaseModel):
     category_name: str
@@ -51,30 +51,33 @@ class InterviewChatResponse(BaseModel):
     pedagogical_decision: Optional[PedagogicalDecision] = None
     is_final_turn: bool = False
 
-# --- Assessment Evaluation Models ---
+# --- Hierarchical Story Models (Step 1 & 2) ---
 
-class AssessmentSubmission(BaseModel):
+class ActBlueprint(BaseModel):
+    act_number: int
+    title: str
+    description: str
+    pedagogical_focus: Optional[str] = None
+
+class StoryArc(BaseModel):
+    story_title: str
+    genre: str
+    acts: List[ActBlueprint] = Field(..., min_items=5, max_items=5)
+    target_cefr_level: str
+
+class GenerateArcRequest(BaseModel):
+    story_elements: StoryElements
     student_state: StudentState
-    category: str
-    level: str
-    answers: Dict[str, Any] # choice_id or text
-    correct_answers: Dict[str, Any]
+    genre_theme: Optional[str] = None
 
-class AssessmentFeedback(BaseModel):
-    is_correct: bool
-    explanation_hebrew: str
-    suggested_state_updates: Dict[str, Any]
-    encouragement_message_hebrew: str
-
-# --- Scene Generation Models ---
-
-class GenerateSceneRequest(BaseModel):
-    category: str
-    target_words: List[str]
+class ActContentRequest(BaseModel):
+    story_arc: StoryArc
+    act_number: int
+    target_words: List[str] = Field(default_factory=list)
+    student_state: StudentState
     plot_history: List[str] = Field(default_factory=list)
-    selected_branch_id: Optional[int] = None
-    student_state: StudentState
-    story_elements: Optional[StoryElements] = None
+
+# --- Assessment & Scene Models (Updated for Step 2) ---
 
 class ComprehensionQuestion(BaseModel):
     question_id: str
@@ -98,6 +101,31 @@ class StoryBranch(BaseModel):
     choice_id: int
     text_hebrew: str
     text_english: str
+
+class ActContentResponse(BaseModel):
+    act_number: int
+    scene_text: str
+    remedial_scene_text: str
+    vocabulary_definitions: Dict[str, str]
+    assessment_tasks: AssessmentTasks
+    story_branches: List[StoryBranch]
+
+# --- Assessment Evaluation Models ---
+
+class AssessmentSubmission(BaseModel):
+    student_state: StudentState
+    category: str
+    level: str
+    answers: Dict[str, Any]
+    correct_answers: Dict[str, Any]
+
+class AssessmentFeedback(BaseModel):
+    is_correct: bool
+    explanation_hebrew: str
+    suggested_state_updates: Dict[str, Any]
+    encouragement_message_hebrew: str
+
+# --- Legacy/Common Scene Models (Kept for compatibility if needed) ---
 
 class SceneMetadata(BaseModel):
     scene_id: int

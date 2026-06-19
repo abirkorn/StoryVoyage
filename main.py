@@ -29,15 +29,23 @@ async def verify_token(x_app_token: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing X-App-Token")
     return x_app_token
 
-# Routes
+# --- Pedagogical Wizard ---
 
 @app.post("/interview-chat", response_model=models.InterviewChatResponse)
 async def interview_chat(request: models.InterviewChatRequest, token: str = Depends(verify_token)):
     return llm_service.generate_interview_response(request)
 
-@app.post("/generate-scene", response_model=models.SceneResponse)
-async def generate_scene(request: models.GenerateSceneRequest, token: str = Depends(verify_token)):
-    return llm_service.generate_story_scene(request)
+# --- Hierarchical Story Pipeline ---
+
+@app.post("/story/generate-arc", response_model=models.StoryArc)
+async def generate_arc(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
+    return llm_service.generate_story_arc(request)
+
+@app.post("/story/generate-act-content", response_model=models.ActContentResponse)
+async def generate_act_content(request: models.ActContentRequest, token: str = Depends(verify_token)):
+    return llm_service.generate_act_content(request)
+
+# --- Assessment & Evaluation ---
 
 @app.post("/evaluate-assessment", response_model=models.AssessmentFeedback)
 async def evaluate_assessment(submission: models.AssessmentSubmission, token: str = Depends(verify_token)):
