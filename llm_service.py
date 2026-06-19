@@ -16,54 +16,19 @@ def get_client():
 
 def generate_interview_response(request: models.InterviewChatRequest) -> models.InterviewChatResponse:
     client = get_client()
-    """
-    Handles the "Story Setup" chat with the child (Hebrew/English mix).
-    Aims to build the story context while assessing the initial English level.
-    """
-    
     system_prompt = f"""
-    You are an expert ESL pedagogical assistant for kids. 
-    Your goal is to help a child "build" their next story adventure.
-    
-    STUDENT STATE:
-    - Current Level: {request.student_state.current_estimated_level}
-    - Assessment History: {json.dumps([r.dict() for r in request.student_state.assessment_history])}
-    - Covered Categories: {json.dumps(request.student_state.covered_categories)}
-    - Total Scenes: {request.student_state.total_scenes_completed}
-    
-    GUIDELINES:
-    1. Conduct the conversation primarily in HEBREW, as the child might not speak English well yet. Use simple English occasionally.
-    2. Be extremely encouraging, magical, and friendly.
-    3. Ask about:
-       - Who is the hero? (Name, what are they like?)
-       - Where does it take place? (Space, jungle, magic school, etc.)
-       - What is the main theme or interest the child wants to explore?
-    4. Use this interaction to subtly assess if the child's level should be adjusted (though usually, we stick to the current level unless they seem very advanced/struggling).
-    5. After 3-4 turns, when you have enough info, conclude the setup.
-    
-    OUTPUT FORMAT:
-    - If continuing the chat: Return a warm response in Hebrew.
-    - If concluding: Return a JSON object with:
-    {{
-        "pedagogical_decision": {{
-            "category_name": "string",
-            "target_words": ["word1", "word2", "word3", "word4", "word5", "word6"],
-            "updated_level": "string",
-            "story_elements": {{
-                "hero_name": "string",
-                "setting": "string",
-                "initial_plot_point": "string"
-            }}
-        }}
-    }}
+    Expert ESL Pedagogical Assistant. Build a story with a child in HEBREW and assess their English level.
+    CONTEXT: Level: {request.student_state.current_estimated_level}
+    INSTRUCTIONS:
+    1. If Level is 'unknown': Ask 1 simple English check question.
+    2. Narrow elements: Hero, Setting, Goal.
+    3. Conclude after 3-4 turns with JSON.
     """
     
     contents = [types.Content(role="user", parts=[types.Part(text=system_prompt)])]
     for msg in request.history:
-        # Map 'model' role to 'model' for Gemini
         role = "model" if msg.role == "model" else "user"
         contents.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
-    
     contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
     
     response = client.models.generate_content(
@@ -72,15 +37,12 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
     )
     
     text = response.text.strip()
-    
-    # Try to extract JSON if it's present
     try:
         json_text = text
         if "```json" in text:
             json_text = text.split("```json")[1].split("```")[0].strip()
         elif "{" in text:
             json_text = text[text.find("{"):text.rfind("}")+1]
-            
         data = json.loads(json_text)
         decision_data = data.get("pedagogical_decision", data)
         if "category_name" in decision_data:
@@ -93,41 +55,74 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
                 ),
                 is_final_turn=True
             )
-    except:
-        pass
-        
+    except: pass
     return models.InterviewChatResponse(chat_response=text, is_final_turn=False)
 
-def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> models.AssessmentFeedback:
-    """
-    Evaluates the student's performance on a scene's assessment tasks and determines pedagogical adjustments.
-    """
+def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
+    """Step 1: Generate the high-level 5-act story blueprint."""
     client = get_client()
+    system_prompt = f"""
+    ESL Story Architect. Generate a 5-act dramatic story arc blueprint for a child.
 
-    # Simple logic combined with LLM insight for the "Pedagogical Strategy"
-    num_correct = sum(1 for k in submission.answers if submission.answers[k] == submission.correct_answers.get(k))
-    total_questions = len(submission.correct_answers)
-    score = num_correct / total_questions if total_questions > 0 else 0
+    ELEMENTS:
+    - Hero: {request.story_elements.hero_name}
+    - Setting: {request.story_elements.setting}
+    - Goal: {request.story_elements.goal}
+    - CEFR Level: {request.student_state.current_estimated_level}
+    - Genre/Theme: {request.genre_theme or "Adventure"}
 
-    prompt = f"""
-    Evaluate the child's performance on their recent ESL tasks.
-
-    Score: {num_correct}/{total_questions}
-    Current Level: {submission.level}
-    Category: {submission.category}
-
-    Student State Context: {submission.student_state.json()}
-
-    Task:
-    1. Provide a warm, encouraging explanation in Hebrew about how they did.
-    2. Decide on a pedagogical update:
-       - Should they 'Level Up' (e.g., A1-Sub1 -> A1-Sub2)?
-       - Should they 'Stay' at the current level?
-       - Should we change the 'Explore/Exploit' strategy?
-
-    Output a JSON matching the AssessmentFeedback model.
+    OUTPUT:
+    A strict JSON matching the StoryArc schema.
+    Define 5 acts: Introduction, Inciting Incident, Rising Action, Climax, Resolution.
+    Each act needs a title and a brief description.
     """
 
+    response = client.models.generate_content(
+        model=SCENE_MODEL_ID,
+        contents=system_prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=models.StoryArc,
+        )
+    )
+    return response.parsed
+
+def generate_act_content(request: models.ActContentRequest) -> models.ActContentResponse:
+    """Step 2: Generate the prose and assessment for a specific act."""
+    client = get_client()
+    act = next((a for a in request.story_arc.acts if a.act_number == request.act_number), None)
+
+    system_prompt = f"""
+    ESL Story Writer. Write the prose for Act {request.act_number}: {act.title if act else 'Next Act'}.
+    
+    STORY ARC CONTEXT:
+    - Overall Arc: {request.story_arc.story_title}
+    - Current Act Goal: {act.description if act else ''}
+    - CEFR Level: {request.student_state.current_estimated_level}
+    - Target Words to weave in: {", ".join(request.target_words)}
+    
+    REQUIREMENTS:
+    1. scene_text: Simple English prose for the act.
+    2. remedial_scene_text: Hebrew translation.
+    3. vocabulary_definitions: Dictionary of target words and their Hebrew meaning.
+    4. assessment_tasks: 1 comprehension (HE), 1 cloze (EN).
+    5. story_branches: 2-3 branches for how the story might transition slightly.
+    """
+    
+    response = client.models.generate_content(
+        model=SCENE_MODEL_ID,
+        contents=system_prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=models.ActContentResponse,
+        )
+    )
+    return response.parsed
+
+def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> models.AssessmentFeedback:
+    client = get_client()
+    num_correct = sum(1 for k in submission.answers if submission.answers[k] == submission.correct_answers.get(k))
+    prompt = f"Score: {num_correct}/{len(submission.correct_answers)}. Give Hebrew feedback (JSON)."
     response = client.models.generate_content(
         model=SCENE_MODEL_ID,
         contents=prompt,
@@ -136,86 +131,17 @@ def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> 
             response_schema=models.AssessmentFeedback,
         )
     )
-
-    return response.parsed
-
-def generate_story_scene(request: models.GenerateSceneRequest) -> models.SceneResponse:
-    """
-    Generates a story scene based on pedagogical constraints, plot history, and story elements.
-    """
-    client = get_client()
-
-    story_context = ""
-    if request.story_elements:
-        story_context = f"""
-        STORY ELEMENTS:
-        - Hero: {request.story_elements.hero_name}
-        - Setting: {request.story_elements.setting}
-        - Initial Plot: {request.story_elements.initial_plot_point}
-        """
-
-    system_prompt = f"""
-    You are a creative ESL storyteller for kids. Generate the next scene in an ongoing story.
-    
-    PEDAGOGICAL CONSTRAINTS:
-    - Level: {request.student_state.current_estimated_level}
-    - Category: {request.category}
-    - Target Words (MUST include these): {", ".join(request.target_words)}
-    
-    {story_context}
-
-    STORY CONTEXT:
-    - Plot History: {json.dumps(request.plot_history)}
-    
-    REQUIREMENTS:
-    - scene_text: Strictly in English. Simple, engaging, and appropriate for the level.
-    - remedial_scene_text: A simplified version of the scene_text in Hebrew.
-    - assessment_tasks: 
-        - comprehension_question: In Hebrew, testing understanding of the scene.
-        - cloze_task: A sentence in English with one of the target words missing. Options and translation in Hebrew.
-    - story_branches: 2-3 choices for the child to continue the story. text_english and text_hebrew required.
-    
-    Output MUST be a strict JSON matching the SceneResponse schema.
-    """
-    
-    response = client.models.generate_content(
-        model=SCENE_MODEL_ID,
-        contents=system_prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.SceneResponse,
-        )
-    )
-    
     return response.parsed
 
 def generate_cefr_exam(request: models.GenerateExamRequest) -> models.ExamResponse:
-    """
-    Generates a CEFR level-up exam.
-    """
     client = get_client()
-    system_prompt = f"""
-    You are an expert ESL examiner. Generate a CEFR level-up exam for level: {request.cefr_level}.
-    
-    Context from previous scenes: {json.dumps(request.scenes_data)}
-    Student State: {request.student_state.json()}
-    
-    REQUIREMENTS:
-    - Generate 5 questions.
-    - Question types: comprehension, vocabulary, grammar, cause/effect, and inference.
-    - All text (titles, instructions, questions, options, explanations) MUST be in Hebrew, except where testing English specific terms.
-    - Passing score is typically 4 out of 5.
-    
-    Output MUST be a strict JSON matching the ExamResponse schema.
-    """
-    
+    prompt = f"Generate CEFR {request.cefr_level} exam in Hebrew. JSON."
     response = client.models.generate_content(
         model=EXAM_MODEL_ID,
-        contents=system_prompt,
+        contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=models.ExamResponse,
         )
     )
-    
     return response.parsed
