@@ -29,6 +29,12 @@ async def verify_token(x_app_token: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing X-App-Token")
     return x_app_token
 
+# --- Adventure Setup (Launchpad) ---
+
+@app.post("/adventure/setup", response_model=models.AdventureSetupResponse)
+async def adventure_setup(request: models.AdventureSetupRequest, token: str = Depends(verify_token)):
+    return llm_service.generate_adventure_setup(request)
+
 # --- Pedagogical Wizard ---
 
 @app.post("/interview-chat", response_model=models.InterviewChatResponse)

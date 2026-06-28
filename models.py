@@ -23,6 +23,25 @@ class StudentState(BaseModel):
     assessment_history: List[AssessmentRecord] = Field(default_factory=list)
     story_preferences: StoryPreferences = Field(default_factory=StoryPreferences)
     total_scenes_completed: int = 0
+    current_rank_index: int = 100 # New field for CEFR rank index
+
+# --- Adventure Setup Models (The Launchpad) ---
+
+class AdventureSetupRequest(BaseModel):
+    rank_index: int
+    genre: str
+
+class LaunchpadAnchor(BaseModel):
+    id: str
+    text: str
+    description: str
+
+class AdventureSetupResponse(BaseModel):
+    heroes: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
+    settings: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
+    catalysts: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
+    potential_story_arcs: List[Dict[str, Any]] # 9 blueprints (3x3x3 selection space conceptually, but 9 for now)
+    selected_vocabulary: List[str] # The 100 words used
 
 # --- Interview Chat Models ---
 
@@ -51,7 +70,7 @@ class InterviewChatResponse(BaseModel):
     pedagogical_decision: Optional[PedagogicalDecision] = None
     is_final_turn: bool = False
 
-# --- Hierarchical Story Models (Step 1 & 2) ---
+# --- Hierarchical Story Models ---
 
 class ActBlueprint(BaseModel):
     act_number: int
@@ -77,7 +96,7 @@ class ActContentRequest(BaseModel):
     student_state: StudentState
     plot_history: List[str] = Field(default_factory=list)
 
-# --- Assessment & Scene Models (Updated for Step 2) ---
+# --- Assessment & Scene Models ---
 
 class ComprehensionQuestion(BaseModel):
     question_id: str
@@ -124,20 +143,6 @@ class AssessmentFeedback(BaseModel):
     explanation_hebrew: str
     suggested_state_updates: Dict[str, Any]
     encouragement_message_hebrew: str
-
-# --- Legacy/Common Scene Models (Kept for compatibility if needed) ---
-
-class SceneMetadata(BaseModel):
-    scene_id: int
-    adaptive_level_applied: str
-
-class SceneResponse(BaseModel):
-    metadata: SceneMetadata
-    scene_text: str
-    remedial_scene_text: str
-    target_words: List[str]
-    assessment_tasks: AssessmentTasks
-    story_branches: List[StoryBranch]
 
 # --- CEFR Exam Models ---
 

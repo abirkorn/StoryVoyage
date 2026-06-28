@@ -26,12 +26,12 @@ An interactive story requires a well-defined starting line. Before the narrative
 
 ## 3. The Structural Tree Methodology (Pacing and Depth)
 
-To maintain a child’s attention span and provide an emotionally satisfying arc, the narrative structure must follow a bounded, balanced tree with a strict depth limitation (typically **3 to 4 levels**). 
+To maintain a child’s attention span and provide an emotionally satisfying arc, the narrative structure must follow a bounded, balanced tree with a strict depth limitation (typically **3 to 4 levels**).
 
 The narrative progression maps perfectly to a compressed version of the classic **Hero’s Journey**, distributed across the tree levels:
 
 ### Level 0: The Setup (The Root Node)
-* **Narrative Function:** Establish the protagonist, paint the setting, and introduce the Catalyst. 
+* **Narrative Function:** Establish the protagonist, paint the setting, and introduce the Catalyst.
 * **Outcome:** The chapter must end exactly at the moment of departure, where the character is forced to make their very first choice to address the catalyst.
 
 ### Level 1 & 2: The Journey & Obstacles (Internal Nodes)
@@ -48,7 +48,7 @@ The narrative progression maps perfectly to a compressed version of the classic 
 
 For an interactive story to feel rewarding, choices must never be arbitrary (e.g., avoiding simple binary paths like *"Turn left"* vs. *"Turn right"*). Instead, the engine should categorize every crossroads into distinct **Choice Archetypes**. These archetypes prompt the child to apply different psychological, ethical, or creative approaches to problem-solving:
 
-* **Bravery vs. Caution:** Confronting an obstacle directly versus finding a safer, strategic alternative. 
+* **Bravery vs. Caution:** Confronting an obstacle directly versus finding a safer, strategic alternative.
     * *Example:* Creeping past the sleeping giant on tiptoes OR searching for a secret tunnel beneath the roots.
 * **Altruism vs. Core Objective:** Pausing the mission to extend kindness to a creature in need versus staying focused entirely on the main goal.
     * *Example:* Stopping to help a lost baby bird fix its nest OR hurrying forward before the magical gates close.
