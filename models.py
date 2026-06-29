@@ -30,6 +30,8 @@ class StudentState(BaseModel):
 class AdventureSetupRequest(BaseModel):
     rank_index: int
     genre: str
+    num_words: int = 100
+    pct_above: float = 0.1
 
 class LaunchpadAnchor(BaseModel):
     id: str
@@ -37,11 +39,11 @@ class LaunchpadAnchor(BaseModel):
     description: str
 
 class AdventureSetupResponse(BaseModel):
-    heroes: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
-    settings: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
-    catalysts: List[LaunchpadAnchor] = Field(..., min_items=3, max_items=3)
-    potential_story_arcs: List[Dict[str, Any]] # 9 blueprints (3x3x3 selection space conceptually, but 9 for now)
-    selected_vocabulary: List[str] # The 100 words used
+    heroes: List[LaunchpadAnchor] = Field(default_factory=list)
+    settings: List[LaunchpadAnchor] = Field(default_factory=list)
+    catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
+    potential_story_arcs: List[Dict[str, Any]] = Field(default_factory=list)
+    selected_vocabulary: List[str] = Field(default_factory=list)
 
 # --- Interview Chat Models ---
 
