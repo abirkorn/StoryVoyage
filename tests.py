@@ -11,11 +11,7 @@ class TestApp(unittest.TestCase):
         self.assertIn("StoryVoyage Advanced Sandbox", response.text)
 
     def test_unauthorized_access(self):
-        # Using the new setup endpoint to test auth
-        response = client.post("/adventure/setup", json={
-            "rank_index": 100,
-            "genre": "Space"
-        })
+        response = client.post("/adventure/setup", json={})
         self.assertEqual(response.status_code, 401)
 
 if __name__ == "__main__":

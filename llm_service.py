@@ -21,7 +21,7 @@ STORY_LOGIC_PATH = "CYOA_story_logic.txt"
 def get_client():
     key = os.getenv("GEMINI_API_KEY")
     if not key:
-        logger.warning("GEMINI_API_KEY not found in environment!")
+        logger.error("GEMINI_API_KEY not found in environment!")
     return genai.Client(api_key=key)
 
 def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> List[str]:
@@ -57,6 +57,12 @@ def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> 
 
 def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.AdventureSetupResponse:
     logger.info(f"Generating Adventure Setup. Genre: {request.genre}, Rank: {request.rank_index}, Words: {request.num_words}")
+
+    # Validation to prevent logic errors with pct_above
+    if request.pct_above > 1.0:
+        logger.warning(f"pct_above {request.pct_above} is > 1.0, likely a UI error. Normalizing to {request.pct_above/100}")
+        request.pct_above /= 100.0
+
     client = get_client()
     words = get_catalog_words(request.rank_index, request.num_words, request.pct_above)
 
@@ -86,6 +92,7 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         Output MUST be a strict JSON matching AdventureSetupResponse schema.
         """
 
+        logger.info(f"Calling LLM ({SCENE_MODEL_ID}) for adventure setup...")
         response = client.models.generate_content(
             model=SCENE_MODEL_ID,
             contents=prompt,
@@ -96,24 +103,19 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         )
 
         if not response or not response.parsed:
-            logger.error("LLM returned empty or unparseable response")
+            logger.error(f"LLM returned empty or unparseable response. Raw: {response.text if response else 'None'}")
             raise ValueError("Invalid LLM response")
 
         data = response.parsed
         data.selected_vocabulary = words
+        logger.info("Adventure setup generated successfully.")
         return data
     except Exception as e:
-        logger.error(f"Failed to generate adventure setup: {e}")
-        # Provide a minimal valid response as emergency fallback to avoid 500
-        return models.AdventureSetupResponse(
-            heroes=[models.LaunchpadAnchor(id="1", text="Hero", description="A brave hero")],
-            settings=[models.LaunchpadAnchor(id="1", text="Forest", description="A deep forest")],
-            catalysts=[models.LaunchpadAnchor(id="1", text="Lost Key", description="A key was lost")],
-            potential_story_arcs=[{"title": "Default Arc"}],
-            selected_vocabulary=words
-        )
+        logger.exception("CRITICAL: Failed to generate adventure setup")
+        raise e
 
 def generate_interview_response(request: models.InterviewChatRequest) -> models.InterviewChatResponse:
+    logger.info("Generating Interview Response...")
     client = get_client()
     system_prompt = f"Pedagogical Assistant. Hebrew interview. Level: {request.student_state.current_estimated_level}. Goal: Story build + Level check."
     contents = [types.Content(role="user", parts=[types.Part(text=system_prompt)])]
@@ -122,54 +124,113 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
         contents.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
     contents.append(types.Content(role="user", parts=[types.Part(text=request.message)]))
     
-    response = client.models.generate_content(model=SCENE_MODEL_ID, contents=contents)
-    text = response.text.strip()
     try:
-        json_text = text
-        if "```json" in text:
-            json_text = text.split("```json")[1].split("```")[0].strip()
-        elif "{" in text:
-            json_text = text[text.find("{"):text.rfind("}")+1]
-        data = json.loads(json_text)
-        decision_data = data.get("pedagogical_decision", data)
-        return models.InterviewChatResponse(
-            pedagogical_decision=models.PedagogicalDecision(
-                category_name=decision_data["category_name"],
-                target_words=decision_data["target_words"],
-                updated_level=decision_data["updated_level"],
-                story_elements=models.StoryElements(**decision_data["story_elements"])
-            ),
-            is_final_turn=True
-        )
-    except: pass
-    return models.InterviewChatResponse(chat_response=text, is_final_turn=False)
+        response = client.models.generate_content(model=SCENE_MODEL_ID, contents=contents)
+        text = response.text.strip()
+        # If the LLM indicates a final decision with JSON
+        if "{" in text:
+            try:
+                json_text = text
+                if "```json" in text:
+                    json_text = text.split("```json")[1].split("```")[0].strip()
+                elif "{" in text:
+                    json_text = text[text.find("{"):text.rfind("}")+1]
+                data = json.loads(json_text)
+                decision_data = data.get("pedagogical_decision", data)
+                logger.info("Interview concluded with pedagogical decision.")
+                return models.InterviewChatResponse(
+                    pedagogical_decision=models.PedagogicalDecision(
+                        category_name=decision_data["category_name"],
+                        target_words=decision_data["target_words"],
+                        updated_level=decision_data["updated_level"],
+                        story_elements=models.StoryElements(**decision_data["story_elements"])
+                    ),
+                    is_final_turn=True
+                )
+            except Exception as json_err:
+                logger.warning(f"Failed to parse interview decision JSON: {json_err}. Falling back to chat.")
+
+        return models.InterviewChatResponse(chat_response=text, is_final_turn=False)
+    except Exception as e:
+        logger.exception("CRITICAL: Failed generate_interview_response")
+        raise e
 
 def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
+    logger.info(f"Generating Story Arc for {request.story_elements.hero_name}...")
     client = get_client()
-    prompt = f"Generate 5-act story arc for {request.story_elements.hero_name}. JSON."
-    response = client.models.generate_content(
-        model=SCENE_MODEL_ID,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.StoryArc,
+    prompt = f"""
+    You are an expert Story Architect for an ESL learning platform.
+    Create a 5-act branching story blueprint based on these elements:
+    HERO: {request.story_elements.hero_name}
+    SETTING: {request.story_elements.setting}
+    GOAL: {request.story_elements.goal}
+
+    The story should follow a 5-act structure:
+    Act 1: Introduction
+    Act 2: Inciting Incident
+    Act 3: Rising Action
+    Act 4: Climax
+    Act 5: Resolution
+
+    Output MUST be a strict JSON matching StoryArc schema.
+    """
+    try:
+        response = client.models.generate_content(
+            model=SCENE_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=models.StoryArc,
+            )
         )
-    )
-    return response.parsed
+        if not response or not response.parsed:
+            logger.error(f"Failed to generate story arc. Raw: {response.text if response else 'None'}")
+            raise ValueError("Invalid Story Arc response")
+        return response.parsed
+    except Exception as e:
+        logger.exception("CRITICAL: Failed generate_story_arc")
+        raise e
 
 def generate_act_content(request: models.ActContentRequest) -> models.ActContentResponse:
+    logger.info(f"Generating Act {request.act_number} content...")
     client = get_client()
-    act = next((a for a in request.story_arc.acts if a.act_number == request.act_number), None)
-    prompt = f"Write Act {request.act_number}. Title: {act.title if act else 'Next'}. CEFR: {request.student_state.current_estimated_level}. Vocab: {', '.join(request.target_words)}. JSON output."
-    response = client.models.generate_content(
-        model=SCENE_MODEL_ID,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.ActContentResponse,
+    act_blueprint = next((a for a in request.story_arc.acts if a.act_number == request.act_number), None)
+
+    prompt = f"""
+    You are an ESL content creator. Write the content for Act {request.act_number} of a story.
+
+    STORY ARC TITLE: {request.story_arc.story_title}
+    ACT BLUEPRINT: {act_blueprint.title if act_blueprint else 'N/A'} - {act_blueprint.description if act_blueprint else 'N/A'}
+    CEFR LEVEL: {request.student_state.current_estimated_level}
+    TARGET VOCABULARY: {", ".join(request.target_words)}
+
+    REQUIREMENTS:
+    1. 'scene_text': Write in SIMPLE ENGLISH suitable for the CEFR level. Integrate target vocabulary naturally.
+    2. 'remedial_scene_text': Provide a HEBREW translation of the scene text.
+    3. 'vocabulary_definitions': Provide HEBREW definitions for the target words.
+    4. 'assessment_tasks':
+       - 'comprehension_question': A question in HEBREW about the scene.
+       - 'cloze_task': An English sentence from the scene with one word missing (the blank).
+    5. 'story_branches': Two choices for what happens next. Provide both HEBREW and ENGLISH text for choices.
+
+    Output MUST be strict JSON matching ActContentResponse schema.
+    """
+    try:
+        response = client.models.generate_content(
+            model=SCENE_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=models.ActContentResponse,
+            )
         )
-    )
-    return response.parsed
+        if not response or not response.parsed:
+            logger.error(f"Failed to generate act content. Raw: {response.text if response else 'None'}")
+            raise ValueError("Invalid Act Content response")
+        return response.parsed
+    except Exception as e:
+        logger.exception("CRITICAL: Failed generate_act_content")
+        raise e
 
 def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> models.AssessmentFeedback:
     client = get_client()
