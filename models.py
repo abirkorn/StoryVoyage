@@ -38,11 +38,15 @@ class LaunchpadAnchor(BaseModel):
     text: str
     description: str
 
+class StoryArcStub(BaseModel):
+    title: str
+    description: str
+
 class AdventureSetupResponse(BaseModel):
     heroes: List[LaunchpadAnchor] = Field(default_factory=list)
     settings: List[LaunchpadAnchor] = Field(default_factory=list)
     catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
-    potential_story_arcs: List[Dict[str, Any]] = Field(default_factory=list)
+    potential_story_arcs: List[StoryArcStub] = Field(default_factory=list)
     selected_vocabulary: List[str] = Field(default_factory=list)
 
 # --- Interview Chat Models ---
@@ -123,11 +127,15 @@ class StoryBranch(BaseModel):
     text_hebrew: str
     text_english: str
 
+class VocabularyDefinition(BaseModel):
+    word: str
+    definition_hebrew: str
+
 class ActContentResponse(BaseModel):
     act_number: int
     scene_text: str
     remedial_scene_text: str
-    vocabulary_definitions: Dict[str, str]
+    vocabulary_definitions: List[VocabularyDefinition]
     assessment_tasks: AssessmentTasks
     story_branches: List[StoryBranch]
 
