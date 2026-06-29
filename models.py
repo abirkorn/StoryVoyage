@@ -48,6 +48,12 @@ class AdventureSetupResponse(BaseModel):
     catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
     potential_story_arcs: List[StoryArcStub] = Field(default_factory=list)
     selected_vocabulary: List[str] = Field(default_factory=list)
+    vocabulary_min_rank: int = 0
+    vocabulary_max_rank: int = 0
+
+class GuardrailRequest(BaseModel):
+    data: AdventureSetupResponse
+    target_rank: int
 
 # --- Interview Chat Models ---
 
