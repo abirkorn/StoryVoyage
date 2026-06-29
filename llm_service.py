@@ -18,20 +18,37 @@ EXAM_MODEL_ID = os.getenv("EXAM_MODEL_ID", "gemini-2.5-pro")
 CATALOG_PATH = "cefr_catalog.json"
 STORY_LOGIC_PATH = "CYOA_story_logic.txt"
 
+_catalog_data = None
+_pos_lookup = {}
+
+def _load_catalog():
+    global _catalog_data, _pos_lookup
+    if _catalog_data is not None:
+        return
+    if os.path.exists(CATALOG_PATH):
+        with open(CATALOG_PATH, "r") as f:
+            _catalog_data = json.load(f)
+        for w in _catalog_data:
+            word = w["w"].lower()
+            if word not in _pos_lookup:
+                _pos_lookup[word] = []
+            _pos_lookup[word].append({"pos": w["pos"], "rank": w["rank"]})
+
 def get_client():
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         logger.error("GEMINI_API_KEY not found in environment!")
     return genai.Client(api_key=key)
 
-def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> List[str]:
+def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> Dict[str, Any]:
     """
     Selects x words from cefr_catalog.json around rank_index.
+    Returns dict with words and rank bounds.
     """
     try:
         if not os.path.exists(CATALOG_PATH):
             logger.error(f"Catalog file missing: {CATALOG_PATH}")
-            return ["friend", "adventure", "magic", "quest", "hero"]
+            return {"words": ["friend", "adventure", "magic", "quest", "hero"], "min_rank": 0, "max_rank": 0}
 
         with open(CATALOG_PATH, "r") as f:
             catalog = json.load(f)
@@ -49,11 +66,17 @@ def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> 
         selected_above = above_words[:num_above] if len(above_words) >= num_above else above_words
 
         all_selected = selected_below + selected_above
-        logger.info(f"Selected {len(all_selected)} words for rank {rank_index}")
-        return [w["w"] for w in all_selected]
+        ranks = [w["rank"] for w in all_selected]
+
+        logger.info(f"Selected {len(all_selected)} words for rank {rank_index}. Range: {min(ranks) if ranks else 0}-{max(ranks) if ranks else 0}")
+        return {
+            "words": [w["w"] for w in all_selected],
+            "min_rank": min(ranks) if ranks else 0,
+            "max_rank": max(ranks) if ranks else 0
+        }
     except Exception as e:
         logger.error(f"Error in get_catalog_words: {e}")
-        return ["water", "tree", "friend", "happy", "big"]
+        return {"words": ["water", "tree", "friend", "happy", "big"], "min_rank": 0, "max_rank": 0}
 
 def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.AdventureSetupResponse:
     logger.info(f"Generating Adventure Setup. Genre: {request.genre}, Rank: {request.rank_index}, Words: {request.num_words}")
@@ -64,7 +87,8 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         request.pct_above /= 100.0
 
     client = get_client()
-    words = get_catalog_words(request.rank_index, request.num_words, request.pct_above)
+    vocab_data = get_catalog_words(request.rank_index, request.num_words, request.pct_above)
+    words = vocab_data["words"]
 
     try:
         if not os.path.exists(STORY_LOGIC_PATH):
@@ -75,7 +99,7 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
                 story_logic = f.read()
 
         prompt = f"""
-        You are an expert ESL Story Architect. build an adventure setup for a child.
+        You are an expert ESL Story Architect. Build a modular adventure setup for a child.
 
         GENRE: {request.genre}
         VOCABULARY TO INTEGRATE: {", ".join(words)}
@@ -83,11 +107,16 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         STORY LOGIC CONTEXT:
         {story_logic}
 
+        CONSTRAINTS:
+        - MANDATORY: Integrate as many words as possible from the VOCABULARY list into the descriptions of Heroes, Settings, and Catalysts.
+        - DIVERSITY: DO NOT use common or overused names like Leo, Mia, Sam, or Max. Choose unique, evocative names.
+        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently.
+
         TASK:
         1. Generate EXACTLY 3 distinct HEROES (ID, text, description).
         2. Generate EXACTLY 3 distinct SETTINGS (ID, text, description).
         3. Generate EXACTLY 3 distinct CATALYSTS (ID, text, description).
-        4. Generate EXACTLY 9 STORY ARCS mapping to selections.
+        4. Generate EXACTLY 9 STORY ARCS. Each arc should represent a unique combination of 1 Hero, 1 Setting, and 1 Catalyst.
 
         Output MUST be a strict JSON matching AdventureSetupResponse schema.
         """
@@ -108,6 +137,8 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
 
         data = response.parsed
         data.selected_vocabulary = words
+        data.vocabulary_min_rank = vocab_data["min_rank"]
+        data.vocabulary_max_rank = vocab_data["max_rank"]
         logger.info("Adventure setup generated successfully.")
         return data
     except Exception as e:
@@ -245,6 +276,45 @@ def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> 
         )
     )
     return response.parsed
+
+def apply_adventure_guardrails(data: models.AdventureSetupResponse, target_rank: int) -> models.AdventureSetupResponse:
+    """
+    Identifies high-rank nouns/adjectives in LLM output and replaces them with
+    simpler alternatives from the catalog.
+    """
+    _load_catalog()
+    if not _catalog_data:
+        return data
+
+    import re
+    # Simple word-by-word replacement logic
+    def simplify_text(text: str, max_rank: int) -> str:
+        words = re.findall(r"\w+", text)
+        new_text = text
+        for w in words:
+            lw = w.lower()
+            if lw in _pos_lookup:
+                # Check if any sense of this word is too hard
+                hardest_rank = max(p["rank"] for p in _pos_lookup[lw])
+                if hardest_rank > max_rank + 200: # Threshold for 'too far'
+                    # Find replacement
+                    target_pos = _pos_lookup[lw][0]["pos"]
+                    replacements = [c for c in _catalog_data if c["pos"] == target_pos and c["rank"] <= max_rank]
+                    if replacements:
+                        # Pick one reasonably close to target rank
+                        best_rep = replacements[-1]["w"]
+                        new_text = re.sub(rf"\b{w}\b", best_rep, new_text)
+        return new_text
+
+    # Apply to Heroes, Settings, Catalysts
+    for h in data.heroes:
+        h.description = simplify_text(h.description, target_rank)
+    for s in data.settings:
+        s.description = simplify_text(s.description, target_rank)
+    for c in data.catalysts:
+        c.description = simplify_text(c.description, target_rank)
+
+    return data
 
 def generate_cefr_exam(request: models.GenerateExamRequest) -> models.ExamResponse:
     client = get_client()

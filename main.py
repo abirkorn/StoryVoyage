@@ -35,6 +35,10 @@ async def verify_token(x_app_token: str = Header(None)):
 async def adventure_setup(request: models.AdventureSetupRequest, token: str = Depends(verify_token)):
     return llm_service.generate_adventure_setup(request)
 
+@app.post("/adventure/apply-guardrails", response_model=models.AdventureSetupResponse)
+async def apply_guardrails(request: models.GuardrailRequest, token: str = Depends(verify_token)):
+    return llm_service.apply_adventure_guardrails(request.data, request.target_rank)
+
 # --- Pedagogical Wizard ---
 
 @app.post("/interview-chat", response_model=models.InterviewChatResponse)
