@@ -46,14 +46,11 @@ def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> 
     Returns dict with words and rank bounds.
     """
     try:
-        if not os.path.exists(CATALOG_PATH):
-            logger.error(f"Catalog file missing: {CATALOG_PATH}")
+        _load_catalog()
+        if not _catalog_data:
             return {"words": ["friend", "adventure", "magic", "quest", "hero"], "min_rank": 0, "max_rank": 0}
 
-        with open(CATALOG_PATH, "r") as f:
-            catalog = json.load(f)
-
-        filtered = [w for w in catalog if w.get("pos") in ["n.", "adj."]]
+        filtered = [w for w in _catalog_data if w.get("pos") in ["n.", "adj."]]
         filtered.sort(key=lambda x: x["rank"])
 
         num_above = int(x * pct_above)
@@ -102,15 +99,16 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         You are an expert ESL Story Architect. Build a modular adventure setup for a child.
 
         GENRE: {request.genre}
-        VOCABULARY TO INTEGRATE: {", ".join(words)}
+        VOCABULARY BANK: {", ".join(words)}
 
         STORY LOGIC CONTEXT:
         {story_logic}
 
         CONSTRAINTS:
-        - MANDATORY: Integrate as many words as possible from the VOCABULARY list into the descriptions of Heroes, Settings, and Catalysts.
-        - DIVERSITY: DO NOT use common or overused names like Leo, Mia, Sam, or Max. Choose unique, evocative names.
-        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently.
+        - LABELS: The 'text' field for each Hero, Setting, and Catalyst MUST primarily use words from the VOCABULARY BANK.
+        - DESCRIPTIONS: The 'description' field can use richer, more descriptive free text to provide context.
+        - VARIABILITY: Use a wide variety of names and titles. Ensure the selections are unique and evocative, avoiding repetitive naming patterns.
+        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently in any combination.
 
         TASK:
         1. Generate EXACTLY 3 distinct HEROES (ID, text, description).
@@ -306,13 +304,13 @@ def apply_adventure_guardrails(data: models.AdventureSetupResponse, target_rank:
                         new_text = re.sub(rf"\b{w}\b", best_rep, new_text)
         return new_text
 
-    # Apply to Heroes, Settings, Catalysts
+    # Apply ONLY to labels (the 'text' field), preserving 'description'
     for h in data.heroes:
-        h.description = simplify_text(h.description, target_rank)
+        h.text = simplify_text(h.text, target_rank)
     for s in data.settings:
-        s.description = simplify_text(s.description, target_rank)
+        s.text = simplify_text(s.text, target_rank)
     for c in data.catalysts:
-        c.description = simplify_text(c.description, target_rank)
+        c.text = simplify_text(c.text, target_rank)
 
     return data
 
