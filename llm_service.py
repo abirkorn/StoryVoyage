@@ -95,26 +95,34 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
             with open(STORY_LOGIC_PATH, "r") as f:
                 story_logic = f.read()
 
+        # Derive name anchor letters from first few words
+        anchor_letters = "".join([w[0].upper() for w in words[:4]])
+
         prompt = f"""
         You are an expert ESL Story Architect. Build a modular adventure setup for a child.
 
         GENRE: {request.genre}
         VOCABULARY BANK: {", ".join(words)}
+        NAME ANCHOR LETTERS: {anchor_letters}
 
         STORY LOGIC CONTEXT:
         {story_logic}
 
         CONSTRAINTS:
-        - LABELS: The 'text' field for each Hero, Setting, and Catalyst MUST primarily use words from the VOCABULARY BANK.
+        - HERO LABELS: For heroes, use the pattern "Name - Short Vocabulary Description".
+          - Example: "Didi - a small monkey" (if 'monkey' is in vocab).
+          - NAMES: Ensure high variability. Use unique names that incorporate or rhyme with the anchor letters '{anchor_letters}' where possible.
+        - SETTING/CATALYST LABELS: The 'text' field MUST primarily use words from the VOCABULARY BANK.
         - DESCRIPTIONS: The 'description' field can use richer, more descriptive free text to provide context.
-        - VARIABILITY: Use a wide variety of names and titles. Ensure the selections are unique and evocative, avoiding repetitive naming patterns.
-        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently in any combination.
+        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently.
 
         TASK:
         1. Generate EXACTLY 3 distinct HEROES (ID, text, description).
         2. Generate EXACTLY 3 distinct SETTINGS (ID, text, description).
         3. Generate EXACTLY 3 distinct CATALYSTS (ID, text, description).
-        4. Generate EXACTLY 9 STORY ARCS. Each arc should represent a unique combination of 1 Hero, 1 Setting, and 1 Catalyst.
+        4. Generate EXACTLY 9 DETAILED STORY ARCS.
+           - Each arc is a 5-act narrative blueprint.
+           - Each act MUST have a 'starting_point' and 'ending_point' that reflect the child's selection or the narrative progression.
 
         Output MUST be a strict JSON matching AdventureSetupResponse schema.
         """
@@ -142,6 +150,17 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
     except Exception as e:
         logger.exception("CRITICAL: Failed to generate adventure setup")
         raise e
+
+def onboarding_final_decision(request: models.GenerateArcRequest) -> models.PedagogicalDecision:
+    # Logic to finalize elements based on wizard interview
+    # This would call LLM to synthesize elements into a DetailedStoryArc eventually
+    # For now, it returns the standard decision structure
+    return models.PedagogicalDecision(
+        category_name="Adventure",
+        target_words=["lion", "brave", "forest", "map", "magic", "sun"],
+        updated_level="A1-Sub1",
+        story_elements=request.story_elements
+    )
 
 def generate_interview_response(request: models.InterviewChatRequest) -> models.InterviewChatResponse:
     logger.info("Generating Interview Response...")
@@ -221,22 +240,27 @@ def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
         raise e
 
 def generate_act_content(request: models.ActContentRequest) -> models.ActContentResponse:
-    logger.info(f"Generating Act {request.act_number} content...")
+    logger.info(f"Generating Act {request.act_blueprint.act_number} content for {request.story_arc_title}...")
     client = get_client()
-    act_blueprint = next((a for a in request.story_arc.acts if a.act_number == request.act_number), None)
+    bp = request.act_blueprint
 
     prompt = f"""
-    You are an ESL content creator. Write the content for Act {request.act_number} of a story.
+    You are an ESL content creator. Write Act {bp.act_number} of an interactive story.
 
-    STORY ARC TITLE: {request.story_arc.story_title}
-    ACT BLUEPRINT: {act_blueprint.title if act_blueprint else 'N/A'} - {act_blueprint.description if act_blueprint else 'N/A'}
+    STORY TITLE: {request.story_arc_title}
+    ACT PLAN: {bp.title}
+    DESCRIPTION: {bp.description}
+    STARTING POINT: {bp.starting_point}
+    ENDING POINT: {bp.ending_point}
+
     CEFR LEVEL: {request.student_state.current_estimated_level}
-    TARGET VOCABULARY: {", ".join(request.target_words)}
+    TARGET WORD COUNT: {request.word_count_target} words.
+    MANDATORY VOCABULARY: {", ".join(request.target_words)}
 
     REQUIREMENTS:
-    1. 'scene_text': Write in SIMPLE ENGLISH suitable for the CEFR level. Integrate target vocabulary naturally.
+    1. 'scene_text': Write in SIMPLE ENGLISH. You MUST include ALL mandatory vocabulary words. The prose must connect the STARTING POINT to the ENDING POINT.
     2. 'remedial_scene_text': Provide a HEBREW translation of the scene text.
-    3. 'vocabulary_definitions': Provide HEBREW definitions for the target words.
+    3. 'vocabulary_definitions': Provide HEBREW definitions for ALL mandatory words.
     4. 'assessment_tasks':
        - 'comprehension_question': A question in HEBREW about the scene.
        - 'cloze_task': An English sentence from the scene with one word missing (the blank).

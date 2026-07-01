@@ -38,15 +38,22 @@ class LaunchpadAnchor(BaseModel):
     text: str
     description: str
 
-class StoryArcStub(BaseModel):
+class DetailedActBlueprint(BaseModel):
+    act_number: int
     title: str
+    starting_point: str
+    ending_point: str
     description: str
+
+class DetailedStoryArc(BaseModel):
+    title: str
+    acts: List[DetailedActBlueprint]
 
 class AdventureSetupResponse(BaseModel):
     heroes: List[LaunchpadAnchor] = Field(default_factory=list)
     settings: List[LaunchpadAnchor] = Field(default_factory=list)
     catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
-    potential_story_arcs: List[StoryArcStub] = Field(default_factory=list)
+    potential_story_arcs: List[DetailedStoryArc] = Field(default_factory=list)
     selected_vocabulary: List[str] = Field(default_factory=list)
     vocabulary_min_rank: int = 0
     vocabulary_max_rank: int = 0
@@ -102,11 +109,11 @@ class GenerateArcRequest(BaseModel):
     genre_theme: Optional[str] = None
 
 class ActContentRequest(BaseModel):
-    story_arc: StoryArc
-    act_number: int
+    story_arc_title: str
+    act_blueprint: DetailedActBlueprint
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
-    plot_history: List[str] = Field(default_factory=list)
+    word_count_target: int = 150
 
 # --- Assessment & Scene Models ---
 
