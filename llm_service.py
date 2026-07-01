@@ -114,15 +114,17 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
           - NAMES: Ensure high variability. Use unique names that incorporate or rhyme with the anchor letters '{anchor_letters}' where possible.
         - SETTING/CATALYST LABELS: The 'text' field MUST primarily use words from the VOCABULARY BANK.
         - DESCRIPTIONS: The 'description' field can use richer, more descriptive free text to provide context.
-        - MODULARITY: Ensure the Heroes, Settings, and Catalysts are distinct and can be mixed and matched coherently.
+        - STORY ARCS:
+          - Generate 9 DETAILED STORY ARCS.
+          - IMPORTANT: Each arc MUST explicitly embed and reference the specific Hero, Setting, and Catalyst combination it represents.
+          - CYOA LOGIC: Each act's 'ending_point' must be a moment of choice.
+          - BRANCH OPTIONS: Provide 2-3 distinct options for what the player can do next.
 
         TASK:
         1. Generate EXACTLY 3 distinct HEROES (ID, text, description).
         2. Generate EXACTLY 3 distinct SETTINGS (ID, text, description).
         3. Generate EXACTLY 3 distinct CATALYSTS (ID, text, description).
-        4. Generate EXACTLY 9 DETAILED STORY ARCS.
-           - Each arc is a 5-act narrative blueprint.
-           - Each act MUST have a 'starting_point' and 'ending_point' that reflect the child's selection or the narrative progression.
+        4. Generate EXACTLY 9 DETAILED STORY ARCS following the constraints above.
 
         Output MUST be a strict JSON matching AdventureSetupResponse schema.
         """
@@ -247,24 +249,33 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     prompt = f"""
     You are an ESL content creator. Write Act {bp.act_number} of an interactive story.
 
-    STORY TITLE: {request.story_arc_title}
-    ACT PLAN: {bp.title}
-    DESCRIPTION: {bp.description}
-    STARTING POINT: {bp.starting_point}
-    ENDING POINT: {bp.ending_point}
+    STORY CONTEXT:
+    - TITLE: {request.story_arc_title}
+    - GENRE: {request.genre}
+    - HERO: {request.hero_description}
+    - SETTING: {request.setting_description}
+    - FLOW: {request.previous_act_title or 'Start'} -> **{bp.title}** -> {request.next_act_title or 'End'}
 
-    CEFR LEVEL: {request.student_state.current_estimated_level}
-    TARGET WORD COUNT: {request.word_count_target} words.
-    MANDATORY VOCABULARY: {", ".join(request.target_words)}
+    ACT DETAILS:
+    - DESCRIPTION: {bp.description}
+    - STARTING POINT: {bp.starting_point}
+    - ENDING POINT: {bp.ending_point}
+    - CHOICE OPTIONS TO BUILD TOWARDS: {", ".join(bp.branch_options)}
+
+    PEDAGOGICAL CONSTRAINTS:
+    - CEFR LEVEL: {request.student_state.current_estimated_level}
+    - TARGET WORD COUNT: {request.word_count_target} words.
+    - MANDATORY VOCABULARY: {", ".join(request.target_words)}
 
     REQUIREMENTS:
-    1. 'scene_text': Write in SIMPLE ENGLISH. You MUST include ALL mandatory vocabulary words. The prose must connect the STARTING POINT to the ENDING POINT.
+    1. 'scene_text': Write in SIMPLE ENGLISH. You MUST include ALL mandatory vocabulary words.
+       The prose must connect the STARTING POINT to the ENDING POINT and lead naturally to the CHOICE OPTIONS.
     2. 'remedial_scene_text': Provide a HEBREW translation of the scene text.
     3. 'vocabulary_definitions': Provide HEBREW definitions for ALL mandatory words.
     4. 'assessment_tasks':
        - 'comprehension_question': A question in HEBREW about the scene.
        - 'cloze_task': An English sentence from the scene with one word missing (the blank).
-    5. 'story_branches': Two choices for what happens next. Provide both HEBREW and ENGLISH text for choices.
+    5. 'story_branches': Match the CHOICE OPTIONS. Provide both HEBREW and ENGLISH text for each.
 
     Output MUST be strict JSON matching ActContentResponse schema.
     """

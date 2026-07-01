@@ -115,18 +115,40 @@
                                 <button onclick="loadToyExample()" class="bg-gray-200 px-3 py-1 rounded text-xs">Toy Example</button>
                             </div>
                         </div>
-                        <div class="grid grid-cols-2 gap-4 mb-4">
-                            <div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div class="col-span-1">
                                 <label class="block text-xs font-bold uppercase text-gray-400">Story Title</label>
                                 <input type="text" id="actStoryTitle" class="w-full border p-2 rounded text-xs">
                             </div>
-                            <div>
+                            <div class="col-span-1">
                                 <label class="block text-xs font-bold uppercase text-gray-400">Word Count Target</label>
                                 <input type="number" id="actWordCount" value="100" class="w-full border p-2 rounded text-xs">
                             </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs font-bold uppercase text-gray-400">Genre</label>
+                                <input type="text" id="actGenre" class="w-full border p-2 rounded text-xs">
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-xs font-bold uppercase text-gray-400">Hero Desc</label>
+                                <input type="text" id="actHeroDesc" class="w-full border p-2 rounded text-xs">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-gray-400">Prev Act</label>
+                                <input type="text" id="actPrev" class="w-full border p-2 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-gray-400">Setting Desc</label>
+                                <input type="text" id="actSettingDesc" class="w-full border p-2 rounded text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-gray-400">Next Act</label>
+                                <input type="text" id="actNext" class="w-full border p-2 rounded text-xs">
+                            </div>
                         </div>
                         <label class="block text-xs font-bold uppercase text-gray-400">Act Blueprint (JSON)</label>
-                        <textarea id="actBlueprintInput" rows="6" class="w-full border p-2 rounded text-xs font-mono mb-2" placeholder='{"act_number": 1, "title": "Start", "starting_point": "Home", "ending_point": "Forest", "description": "Leo leaves home."}'></textarea>
+                        <textarea id="actBlueprintInput" rows="6" class="w-full border p-2 rounded text-xs font-mono mb-2" placeholder='{"act_number": 1, "title": "Start", "starting_point": "Home", "ending_point": "Forest", "description": "Leo leaves home.", "branch_options": ["Enter forest", "Run away"]}'></textarea>
 
                         <label class="block text-xs font-bold uppercase text-gray-400">Mandatory Words (comma separated)</label>
                         <input type="text" id="actWordsInput" value="magic, moon" class="w-full border p-2 rounded mb-4 text-xs">
@@ -277,9 +299,22 @@
 
         function sendToActGenerator(arcIndex) {
             const arc = gState.lastLaunchData.potential_story_arcs[arcIndex];
+            const data = gState.lastLaunchData;
+
+            // Map the arc to specific hero/setting/catalyst if embedded logic allows,
+            // but for sandbox let's just pick indices based on arc index modulo 3
+            const hIdx = arcIndex % 3;
+            const sIdx = (arcIndex + 1) % 3;
+
             document.getElementById('actStoryTitle').value = arc.title;
+            document.getElementById('actGenre').value = document.getElementById('launchGenre').value;
+            document.getElementById('actHeroDesc').value = data.heroes[hIdx].description;
+            document.getElementById('actSettingDesc').value = data.settings[sIdx].description;
+            document.getElementById('actPrev').value = "";
+            document.getElementById('actNext').value = arc.acts[1].title;
+
             document.getElementById('actBlueprintInput').value = JSON.stringify(arc.acts[0], null, 2);
-            document.getElementById('actWordsInput').value = gState.lastLaunchData.selected_vocabulary.slice(0, 10).join(', ');
+            document.getElementById('actWordsInput').value = data.selected_vocabulary.slice(0, 10).join(', ');
             showTab('act');
         }
 
@@ -289,9 +324,15 @@
                 title: "The Mysterious Discovery",
                 starting_point: "Leo is bored in his room.",
                 ending_point: "Leo finds a glowing map under his bed.",
-                description: "The hero discovers the inciting incident."
+                description: "The hero discovers the inciting incident.",
+                branch_options: ["Check the map", "Hide it"]
             };
             document.getElementById('actStoryTitle').value = "Sample Adventure";
+            document.getElementById('actGenre').value = "Mystery";
+            document.getElementById('actHeroDesc').value = "Leo - a curious boy";
+            document.getElementById('actSettingDesc').value = "A dusty attic";
+            document.getElementById('actPrev').value = "";
+            document.getElementById('actNext').value = "The Forbidden Gate";
             document.getElementById('actBlueprintInput').value = JSON.stringify(toy, null, 2);
             document.getElementById('actWordsInput').value = "magic, glowing, map, secret, dusty";
         }
@@ -346,7 +387,12 @@
                     act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
                     target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()),
                     student_state: { current_estimated_level: 'A1-Sub1' },
-                    word_count_target: parseInt(document.getElementById('actWordCount').value)
+                    word_count_target: parseInt(document.getElementById('actWordCount').value),
+                    hero_description: document.getElementById('actHeroDesc').value,
+                    setting_description: document.getElementById('actSettingDesc').value,
+                    genre: document.getElementById('actGenre').value,
+                    previous_act_title: document.getElementById('actPrev').value,
+                    next_act_title: document.getElementById('actNext').value
                 };
                 const data = await apiCall('/story/generate-act-content', body);
                 document.getElementById('actResult').classList.remove('hidden');
@@ -390,20 +436,28 @@
             u_playAct();
         }
         async function u_playAct() {
+            const arc = gState.arc;
+            const lData = gState.lastLaunchData;
+            const actIdx = gState.act - 1;
             const body = {
-                story_arc_title: gState.arc.title,
-                act_blueprint: gState.arc.acts[gState.act - 1],
-                target_words: gState.lastLaunchData.selected_vocabulary.slice(0, 5),
+                story_arc_title: arc.title,
+                act_blueprint: arc.acts[actIdx],
+                target_words: lData.selected_vocabulary.slice(actIdx * 5, (actIdx + 1) * 5),
                 student_state: { current_estimated_level: 'A1-Sub1' },
-                word_count_target: 100
+                word_count_target: 100,
+                hero_description: lData.heroes[0].description,
+                setting_description: lData.settings[0].description,
+                genre: document.getElementById('launchGenre').value,
+                previous_act_title: actIdx > 0 ? arc.acts[actIdx-1].title : null,
+                next_act_title: actIdx < 4 ? arc.acts[actIdx+1].title : null
             };
-            const data = await apiCall('/story/generate-act-content', body);
-            gState.lastActData = data;
-            document.getElementById('u-game-area').innerText = data.scene_text;
+            const actData = await apiCall('/story/generate-act-content', body);
+            gState.lastActData = actData;
+            document.getElementById('u-game-area').innerText = actData.scene_text;
             document.getElementById('u-assessment').classList.remove('hidden');
-            document.getElementById('u-question').innerText = data.assessment_tasks.comprehension_question.question_text_hebrew;
+            document.getElementById('u-question').innerText = actData.assessment_tasks.comprehension_question.question_text_hebrew;
             const opts = document.getElementById('u-options'); opts.innerHTML = '';
-            data.assessment_tasks.comprehension_question.options_hebrew.forEach((o, i) => {
+            actData.assessment_tasks.comprehension_question.options_hebrew.forEach((o, i) => {
                 opts.innerHTML += `<label class='block'><input type='radio' name='u-opt' value='${i}'> ${o}</label>`;
             });
         }
