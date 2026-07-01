@@ -44,6 +44,7 @@ class DetailedActBlueprint(BaseModel):
     starting_point: str
     ending_point: str
     description: str
+    branch_options: List[str] = Field(default_factory=list)
 
 class DetailedStoryArc(BaseModel):
     title: str
@@ -114,6 +115,11 @@ class ActContentRequest(BaseModel):
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
     word_count_target: int = 150
+    hero_description: Optional[str] = None
+    setting_description: Optional[str] = None
+    genre: Optional[str] = None
+    previous_act_title: Optional[str] = None
+    next_act_title: Optional[str] = None
 
 # --- Assessment & Scene Models ---
 
