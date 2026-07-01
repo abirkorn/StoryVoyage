@@ -51,6 +51,11 @@ async def interview_chat(request: models.InterviewChatRequest, token: str = Depe
 async def generate_arc(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
     return llm_service.generate_story_arc(request)
 
+@app.post("/story/onboarding-decision", response_model=models.PedagogicalDecision)
+async def onboarding_decision(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
+    # This might be used by the wizard to finalize the arc and pedagogical state
+    return llm_service.onboarding_final_decision(request)
+
 @app.post("/story/generate-act-content", response_model=models.ActContentResponse)
 async def generate_act_content(request: models.ActContentRequest, token: str = Depends(verify_token)):
     return llm_service.generate_act_content(request)
