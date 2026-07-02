@@ -247,7 +247,7 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     bp = request.act_blueprint
 
     prompt = f"""
-    You are an ESL content creator. Write Act {bp.act_number} of an interactive story.
+    You are an ESL content creator and narrative specialist. Write Act {bp.act_number} of an immersive interactive story.
 
     STORY CONTEXT:
     - TITLE: {request.story_arc_title}
@@ -264,18 +264,24 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
 
     PEDAGOGICAL CONSTRAINTS:
     - CEFR LEVEL: {request.student_state.current_estimated_level}
-    - TARGET WORD COUNT: {request.word_count_target} words.
-    - MANDATORY VOCABULARY: {", ".join(request.target_words)}
+    - TARGET WORD COUNT: Aim for {request.word_count_target} words. DO NOT sacrifice story quality for word count, but expand with sensory details.
+    - VOCABULARY POOL: {", ".join(request.target_words)}
+    - SELECTION: Select at least 10 words from the VOCABULARY POOL above to incorporate naturally.
 
-    REQUIREMENTS:
-    1. 'scene_text': Write in SIMPLE ENGLISH. You MUST include ALL mandatory vocabulary words.
-       The prose must connect the STARTING POINT to the ENDING POINT and lead naturally to the CHOICE OPTIONS.
-    2. 'remedial_scene_text': Provide a HEBREW translation of the scene text.
-    3. 'vocabulary_definitions': Provide HEBREW definitions for ALL mandatory words.
-    4. 'assessment_tasks':
-       - 'comprehension_question': A question in HEBREW about the scene.
-       - 'cloze_task': An English sentence from the scene with one word missing (the blank).
-    5. 'story_branches': Match the CHOICE OPTIONS. Provide both HEBREW and ENGLISH text for each.
+    CRITICAL NARRATIVE REQUIREMENTS:
+    - COHERENCE: The story MUST flow logically. Avoid "forced" sentences. Integrate vocabulary seamlessly into the narrative.
+    - DESCRIPTIVE DEPTH: Meet the word count by describing the environment, character feelings, and specific actions.
+    - PROGRESSION: The prose must bridge the STARTING POINT and the ENDING POINT, culminating in the CHOICE OPTIONS.
+
+    OUTPUT SCHEMA REQUIREMENTS:
+    1. 'scene_text': The immersive English story.
+    2. 'remedial_scene_text': A HEBREW translation of the scene.
+    3. 'used_vocabulary': List the words from the pool that you actually incorporated.
+    4. 'vocabulary_definitions': HEBREW definitions for the words in 'used_vocabulary'.
+    5. 'assessment_tasks':
+       - 'comprehension_question': HEBREW question about the narrative.
+       - 'cloze_task': English sentence from the scene with a blank.
+    6. 'story_branches': Matches the CHOICE OPTIONS in HEBREW and ENGLISH.
 
     Output MUST be strict JSON matching ActContentResponse schema.
     """
