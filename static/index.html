@@ -150,12 +150,13 @@
                         <label class="block text-xs font-bold uppercase text-gray-400">Act Blueprint (JSON)</label>
                         <textarea id="actBlueprintInput" rows="6" class="w-full border p-2 rounded text-xs font-mono mb-2" placeholder='{"act_number": 1, "title": "Start", "starting_point": "Home", "ending_point": "Forest", "description": "Leo leaves home.", "branch_options": ["Enter forest", "Run away"]}'></textarea>
 
-                        <label class="block text-xs font-bold uppercase text-gray-400">Mandatory Words (comma separated)</label>
-                        <input type="text" id="actWordsInput" value="magic, moon" class="w-full border p-2 rounded mb-4 text-xs">
+                        <label class="block text-xs font-bold uppercase text-gray-400">Vocabulary Pool (comma separated)</label>
+                        <textarea id="actWordsInput" rows="2" class="w-full border p-2 rounded mb-4 text-xs" placeholder="magic, moon, adventure..."></textarea>
 
                         <button onclick="generateActProse()" id="genActBtn" class="bg-green-600 text-white px-6 py-2 rounded font-medium w-full">Generate Prose</button>
 
                         <div id="actResult" class="mt-4 hidden space-y-2">
+                            <div id="actUsedWords" class="flex flex-wrap gap-2 mb-2"></div>
                             <div id="actSceneText" class="p-3 bg-blue-50 border rounded italic"></div>
                             <div id="actProseJson" class="json-inspector"></div>
                         </div>
@@ -314,7 +315,8 @@
             document.getElementById('actNext').value = arc.acts[1].title;
 
             document.getElementById('actBlueprintInput').value = JSON.stringify(arc.acts[0], null, 2);
-            document.getElementById('actWordsInput').value = data.selected_vocabulary.slice(0, 10).join(', ');
+            // Send a pool of 25 words
+            document.getElementById('actWordsInput').value = data.selected_vocabulary.slice(0, 25).join(', ');
             showTab('act');
         }
 
@@ -385,7 +387,7 @@
                 const body = {
                     story_arc_title: document.getElementById('actStoryTitle').value,
                     act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
-                    target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()),
+                    target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()).filter(w => w),
                     student_state: { current_estimated_level: 'A1-Sub1' },
                     word_count_target: parseInt(document.getElementById('actWordCount').value),
                     hero_description: document.getElementById('actHeroDesc').value,
@@ -397,6 +399,7 @@
                 const data = await apiCall('/story/generate-act-content', body);
                 document.getElementById('actResult').classList.remove('hidden');
                 document.getElementById('actSceneText').innerText = data.scene_text;
+                document.getElementById('actUsedWords').innerHTML = data.used_vocabulary.map(w => `<span class='bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold'>${w}</span>`).join('');
                 document.getElementById('actProseJson').innerText = JSON.stringify(data, null, 2);
             } catch (e) {} finally { btn.disabled = false; }
         }
@@ -442,9 +445,10 @@
             const body = {
                 story_arc_title: arc.title,
                 act_blueprint: arc.acts[actIdx],
-                target_words: lData.selected_vocabulary.slice(actIdx * 5, (actIdx + 1) * 5),
+                // Pool of 20 words for unified flow
+                target_words: lData.selected_vocabulary.slice(actIdx * 10, (actIdx + 1) * 10 + 10),
                 student_state: { current_estimated_level: 'A1-Sub1' },
-                word_count_target: 100,
+                word_count_target: 150,
                 hero_description: lData.heroes[0].description,
                 setting_description: lData.settings[0].description,
                 genre: document.getElementById('launchGenre').value,

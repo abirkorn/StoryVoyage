@@ -155,6 +155,7 @@ class ActContentResponse(BaseModel):
     scene_text: str
     remedial_scene_text: str
     vocabulary_definitions: List[VocabularyDefinition]
+    used_vocabulary: List[str] = Field(default_factory=list)
     assessment_tasks: AssessmentTasks
     story_branches: List[StoryBranch]
 
