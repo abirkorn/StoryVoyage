@@ -38,7 +38,7 @@ class LaunchpadAnchor(BaseModel):
     text: str
     description: str
 
-class DetailedActBlueprint(BaseModel):
+class ActBlueprint(BaseModel):
     act_number: int
     title: str
     starting_point: str
@@ -46,15 +46,15 @@ class DetailedActBlueprint(BaseModel):
     description: str
     branch_options: List[str] = Field(default_factory=list)
 
-class DetailedStoryArc(BaseModel):
+class StoryArc(BaseModel):
     title: str
-    acts: List[DetailedActBlueprint]
+    acts: List[ActBlueprint]
 
 class AdventureSetupResponse(BaseModel):
     heroes: List[LaunchpadAnchor] = Field(default_factory=list)
     settings: List[LaunchpadAnchor] = Field(default_factory=list)
     catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
-    potential_story_arcs: List[DetailedStoryArc] = Field(default_factory=list)
+    potential_story_arcs: List[StoryArc] = Field(default_factory=list)
     selected_vocabulary: List[str] = Field(default_factory=list)
     vocabulary_min_rank: int = 0
     vocabulary_max_rank: int = 0
@@ -92,18 +92,6 @@ class InterviewChatResponse(BaseModel):
 
 # --- Hierarchical Story Models ---
 
-class ActBlueprint(BaseModel):
-    act_number: int
-    title: str
-    description: str
-    pedagogical_focus: Optional[str] = None
-
-class StoryArc(BaseModel):
-    story_title: str
-    genre: str
-    acts: List[ActBlueprint] = Field(..., min_items=5, max_items=5)
-    target_cefr_level: str
-
 class GenerateArcRequest(BaseModel):
     story_elements: StoryElements
     student_state: StudentState
@@ -111,7 +99,7 @@ class GenerateArcRequest(BaseModel):
 
 class ActContentRequest(BaseModel):
     story_arc_title: str
-    act_blueprint: DetailedActBlueprint
+    act_blueprint: ActBlueprint
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
     word_count_target: int = 150
