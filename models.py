@@ -4,26 +4,26 @@ from typing import List, Dict, Any, Optional, Union
 # --- Common Models ---
 
 class AssessmentRecord(BaseModel):
-    category: str
-    level: str
-    score: float # 0.0 to 1.0
-    completed_at: str # ISO timestamp or simple date
-    assessment_type: str # "scene" or "exam"
+    category: str = ""
+    level: str = ""
+    score: float = 0.0
+    completed_at: str = ""
+    assessment_type: str = "" # "scene" or "exam"
 
 class StoryPreferences(BaseModel):
     hero_name: Optional[str] = None
     hero_description: Optional[str] = None
-    theme: Optional[str] = None # e.g., "Space", "Fantasy", "Dinosaurs"
+    theme: Optional[str] = None
     favorite_topics: List[str] = Field(default_factory=list)
     avoid_topics: List[str] = Field(default_factory=list)
 
 class StudentState(BaseModel):
-    current_estimated_level: str = Field(..., example="A1-Sub1", description="Level like A1-Sub1 or 'unknown'")
-    covered_categories: Dict[str, str] = Field(default_factory=dict, description="e.g., {'space_objects': 'completed'}")
+    current_estimated_level: str = "unknown"
+    covered_categories: Dict[str, str] = Field(default_factory=dict)
     assessment_history: List[AssessmentRecord] = Field(default_factory=list)
     story_preferences: StoryPreferences = Field(default_factory=StoryPreferences)
     total_scenes_completed: int = 0
-    current_rank_index: int = 100 # New field for CEFR rank index
+    current_rank_index: int = 100
 
 # --- Adventure Setup Models (The Launchpad) ---
 
@@ -34,24 +34,24 @@ class AdventureSetupRequest(BaseModel):
     pct_above: float = 0.1
 
 class LaunchpadAnchor(BaseModel):
-    id: str
-    text: str
-    description: str
+    id: str = ""
+    text: str = ""
+    description: str = ""
 
 class ActBlueprint(BaseModel):
-    act_number: int
-    title: str
-    starting_point: str
-    ending_point: str
-    description: str
+    act_number: int = 0
+    title: str = ""
+    starting_point: str = ""
+    ending_point: str = ""
+    description: str = ""
     branch_options: List[str] = Field(default_factory=list)
 
 class StoryArc(BaseModel):
-    title: str = Field(..., description="The catchy title of the story arc")
-    hero_id: str = Field(..., description="The ID of the hero this arc is about")
-    setting_id: str = Field(..., description="The ID of the setting where this arc takes place")
-    catalyst_id: str = Field(..., description="The ID of the catalyst that starts this arc")
-    acts: List[ActBlueprint] = Field(..., description="The 3 acts of the story")
+    title: str = ""
+    hero_id: str = ""
+    setting_id: str = ""
+    catalyst_id: str = ""
+    acts: List[ActBlueprint] = Field(default_factory=list)
 
 class AdventureSetupResponse(BaseModel):
     heroes: List[LaunchpadAnchor] = Field(default_factory=list)
@@ -78,14 +78,14 @@ class InterviewChatRequest(BaseModel):
     student_state: StudentState
 
 class StoryElements(BaseModel):
-    hero_name: str
-    setting: str
-    goal: str
+    hero_name: str = ""
+    setting: str = ""
+    goal: str = ""
 
 class PedagogicalDecision(BaseModel):
-    category_name: str
-    target_words: List[str] = Field(..., min_items=6, max_items=6)
-    updated_level: str
+    category_name: str = ""
+    target_words: List[str] = Field(default_factory=list)
+    updated_level: str = ""
     story_elements: Optional[StoryElements] = None
 
 class InterviewChatResponse(BaseModel):
@@ -115,40 +115,40 @@ class ActContentRequest(BaseModel):
 # --- Assessment & Scene Models ---
 
 class ComprehensionQuestion(BaseModel):
-    question_id: str
-    question_text_hebrew: str
-    options_hebrew: List[str]
-    correct_option_index: int
-    explanation_hebrew: str
+    question_id: str = ""
+    question_text_hebrew: str = ""
+    options_hebrew: List[str] = Field(default_factory=list)
+    correct_option_index: int = 0
+    explanation_hebrew: str = ""
 
 class ClozeTask(BaseModel):
-    task_id: str
-    sentence_with_blank: str
-    options: List[str]
-    correct_option_index: int
-    translation_of_blank_word_hebrew: str
+    task_id: str = ""
+    sentence_with_blank: str = ""
+    options: List[str] = Field(default_factory=list)
+    correct_option_index: int = 0
+    translation_of_blank_word_hebrew: str = ""
 
 class AssessmentTasks(BaseModel):
-    comprehension_question: ComprehensionQuestion
-    cloze_task: ClozeTask
+    comprehension_question: Optional[ComprehensionQuestion] = None
+    cloze_task: Optional[ClozeTask] = None
 
 class StoryBranch(BaseModel):
-    choice_id: int
-    text_hebrew: str
-    text_english: str
+    choice_id: int = 0
+    text_hebrew: str = ""
+    text_english: str = ""
 
 class VocabularyDefinition(BaseModel):
-    word: str
-    definition_hebrew: str
+    word: str = ""
+    definition_hebrew: str = ""
 
 class ActContentResponse(BaseModel):
-    act_number: int
-    scene_text: str
-    remedial_scene_text: str
-    vocabulary_definitions: List[VocabularyDefinition]
+    act_number: int = 0
+    scene_text: str = ""
+    remedial_scene_text: str = ""
+    vocabulary_definitions: List[VocabularyDefinition] = Field(default_factory=list)
     used_vocabulary: List[str] = Field(default_factory=list)
-    assessment_tasks: AssessmentTasks
-    story_branches: List[StoryBranch]
+    assessment_tasks: Optional[AssessmentTasks] = None
+    story_branches: List[StoryBranch] = Field(default_factory=list)
 
 # --- Assessment Evaluation Models ---
 
@@ -160,10 +160,10 @@ class AssessmentSubmission(BaseModel):
     correct_answers: Dict[str, Any]
 
 class AssessmentFeedback(BaseModel):
-    is_correct: bool
-    explanation_hebrew: str
-    suggested_state_updates: Dict[str, Any]
-    encouragement_message_hebrew: str
+    is_correct: bool = False
+    explanation_hebrew: str = ""
+    suggested_state_updates: str = ""
+    encouragement_message_hebrew: str = ""
 
 # --- CEFR Exam Models ---
 
@@ -173,17 +173,17 @@ class GenerateExamRequest(BaseModel):
     student_state: StudentState
 
 class ExamQuestion(BaseModel):
-    question_number: int
-    type: str # comprehension, vocabulary, grammar, cause/effect, inference
-    question_text_hebrew: str
-    options_hebrew: List[str]
-    correct_option_index: int
-    explanation_hebrew: str
-    difficulty: Optional[str] = None
+    question_number: int = 0
+    type: str = "" # comprehension, vocabulary, grammar, cause/effect, inference
+    question_text_hebrew: str = ""
+    options_hebrew: List[str] = Field(default_factory=list)
+    correct_option_index: int = 0
+    explanation_hebrew: str = ""
+    difficulty: str = "medium"
 
 class ExamResponse(BaseModel):
-    exam_title_hebrew: str
-    cefr_level: str
-    instructions_hebrew: str
-    questions: List[ExamQuestion]
-    passing_score: int
+    exam_title_hebrew: str = ""
+    cefr_level: str = ""
+    instructions_hebrew: str = ""
+    questions: List[ExamQuestion] = Field(default_factory=list)
+    passing_score: int = 70

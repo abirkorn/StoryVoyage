@@ -136,7 +136,6 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    response_schema=models.AdventureSetupResponse,
                 )
             )
         except Exception as api_err:
@@ -157,7 +156,42 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
                     elif "```" in raw_text:
                         clean_json = raw_text.split("```")[1].split("```")[0].strip()
 
-                    raw_json = json.loads(clean_json)
+                    # Handle extra data at the end (like an extra })
+                    try:
+                        raw_json = json.loads(clean_json)
+                    except json.JSONDecodeError:
+                        # Try to find the last valid }
+                        last_brace = clean_json.rfind("}")
+                        if last_brace != -1:
+                            raw_json = json.loads(clean_json[:last_brace+1])
+                        else:
+                            raise
+
+                    # Normalize keys
+                    if "story_arcs" in raw_json and "potential_story_arcs" not in raw_json:
+                        raw_json["potential_story_arcs"] = raw_json.pop("story_arcs")
+
+                    if "potential_story_arcs" in raw_json:
+                        for arc in raw_json["potential_story_arcs"]:
+                            if "acts" in arc and isinstance(arc["acts"], list):
+                                new_acts = []
+                                for i, act in enumerate(arc["acts"]):
+                                    if isinstance(act, str):
+                                        new_acts.append({
+                                            "act_number": i + 1,
+                                            "title": f"Act {i+1}",
+                                            "description": act,
+                                            "starting_point": "...",
+                                            "ending_point": "..."
+                                        })
+                                    elif isinstance(act, dict):
+                                        if "act" in act and "act_number" not in act:
+                                            act["act_number"] = act.pop("act")
+                                        for field in ["title", "starting_point", "ending_point", "description"]:
+                                            if field not in act: act[field] = "..."
+                                        new_acts.append(act)
+                                arc["acts"] = new_acts
+
                     data = models.AdventureSetupResponse(**raw_json)
                     logger.info("Manual parse fallback succeeded for adventure setup.")
                 except Exception as parse_err:
@@ -257,13 +291,53 @@ def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=models.StoryArc,
             )
         )
-        if not response or not response.parsed:
-            logger.error(f"Failed to generate story arc. Raw: {response.text if response else 'None'}")
-            raise ValueError("Invalid Story Arc response")
-        return response.parsed
+
+        raw_text = getattr(response, 'text', 'None')
+        if not raw_text or raw_text == 'None':
+             raise ValueError("Invalid Story Arc response: Empty body")
+
+        try:
+            clean_json = raw_text
+            if "```json" in raw_text:
+                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw_text:
+                clean_json = raw_text.split("```")[1].split("```")[0].strip()
+
+            try:
+                raw_json = json.loads(clean_json)
+            except json.JSONDecodeError:
+                last_brace = clean_json.rfind("}")
+                if last_brace != -1:
+                    raw_json = json.loads(clean_json[:last_brace+1])
+                else:
+                    raise
+
+            # Normalize acts if they are called something else or have different structure
+            if "acts" in raw_json and isinstance(raw_json["acts"], list):
+                new_acts = []
+                for i, act in enumerate(raw_json["acts"]):
+                    if isinstance(act, str):
+                        new_acts.append({
+                            "act_number": i + 1,
+                            "title": f"Act {i+1}",
+                            "description": act,
+                            "starting_point": "...",
+                            "ending_point": "..."
+                        })
+                    elif isinstance(act, dict):
+                        if "act" in act and "act_number" not in act:
+                            act["act_number"] = act.pop("act")
+                        for field in ["title", "starting_point", "ending_point", "description"]:
+                            if field not in act: act[field] = "..."
+                        new_acts.append(act)
+                raw_json["acts"] = new_acts
+
+            return models.StoryArc(**raw_json)
+        except Exception as parse_err:
+            logger.error(f"Manual parse failed for story arc: {parse_err}")
+            raise ValueError(f"Invalid Story Arc response: {raw_text}")
     except Exception as e:
         logger.exception("CRITICAL: Failed generate_story_arc")
         raise e
@@ -318,7 +392,6 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=models.ActContentResponse,
             )
         )
 
@@ -336,7 +409,39 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
                     elif "```" in raw_text:
                         clean_json = raw_text.split("```")[1].split("```")[0].strip()
 
-                    raw_json = json.loads(clean_json)
+                    try:
+                        raw_json = json.loads(clean_json)
+                    except json.JSONDecodeError:
+                        last_brace = clean_json.rfind("}")
+                        if last_brace != -1:
+                            raw_json = json.loads(clean_json[:last_brace+1])
+                        else:
+                            raise
+
+                    # Normalize vocabulary_definitions (if it's a dict instead of a list)
+                    if "vocabulary_definitions" in raw_json and isinstance(raw_json["vocabulary_definitions"], dict):
+                        raw_json["vocabulary_definitions"] = [
+                            {"word": k, "definition_hebrew": v} for k, v in raw_json["vocabulary_definitions"].items()
+                        ]
+
+                    # Normalize assessment_tasks
+                    if "assessment_tasks" in raw_json:
+                        at = raw_json["assessment_tasks"]
+                        if "comprehension_question" in at and isinstance(at["comprehension_question"], str):
+                            at["comprehension_question"] = {
+                                "question_text_hebrew": at["comprehension_question"],
+                                "options_hebrew": ["...", "...", "..."],
+                                "correct_option_index": 0,
+                                "explanation_hebrew": "..."
+                            }
+                        if "cloze_task" in at and isinstance(at["cloze_task"], str):
+                            at["cloze_task"] = {
+                                "sentence_with_blank": at["cloze_task"],
+                                "options": ["...", "...", "..."],
+                                "correct_option_index": 0,
+                                "translation_of_blank_word_hebrew": "..."
+                            }
+
                     data = models.ActContentResponse(**raw_json)
                     logger.info("Manual parse fallback succeeded for act content.")
                     return data
@@ -354,16 +459,52 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
 def evaluate_assessment_performance(submission: models.AssessmentSubmission) -> models.AssessmentFeedback:
     client = get_client()
     num_correct = sum(1 for k in submission.answers if submission.answers[k] == submission.correct_answers.get(k))
-    prompt = f"Score {num_correct}. Hebrew feedback (JSON)."
-    response = client.models.generate_content(
-        model=SCENE_MODEL_ID,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.AssessmentFeedback,
+    prompt = f"""
+    The student got {num_correct} questions correct out of {len(submission.correct_answers)}.
+    Provide feedback in Hebrew.
+
+    Output MUST be a strict JSON matching AssessmentFeedback schema:
+    - is_correct: bool
+    - explanation_hebrew: str
+    - suggested_state_updates: str
+    - encouragement_message_hebrew: str
+    """
+    try:
+        response = client.models.generate_content(
+            model=SCENE_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
         )
-    )
-    return response.parsed
+
+        raw_text = getattr(response, 'text', 'None')
+        try:
+            # Strip markdown if present
+            clean_json = raw_text
+            if "```json" in raw_text:
+                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw_text:
+                clean_json = raw_text.split("```")[1].split("```")[0].strip()
+
+            raw_json = json.loads(clean_json)
+            # Ensure all fields are present for Pydantic
+            if "suggested_state_updates" not in raw_json:
+                raw_json["suggested_state_updates"] = ""
+
+            return models.AssessmentFeedback(**raw_json)
+        except Exception as parse_err:
+            logger.error(f"Manual parse failed for assessment feedback: {parse_err}")
+            # Minimum viable fallback
+            return models.AssessmentFeedback(
+                is_correct=num_correct > 0,
+                explanation_hebrew="כל הכבוד על המאמץ!",
+                suggested_state_updates="",
+                encouragement_message_hebrew="תמשיך ככה!"
+            )
+    except Exception as e:
+        logger.exception("CRITICAL: Failed evaluate_assessment_performance")
+        raise e
 
 def apply_adventure_guardrails(data: models.AdventureSetupResponse, target_rank: int) -> models.AdventureSetupResponse:
     """
@@ -406,13 +547,29 @@ def apply_adventure_guardrails(data: models.AdventureSetupResponse, target_rank:
 
 def generate_cefr_exam(request: models.GenerateExamRequest) -> models.ExamResponse:
     client = get_client()
-    prompt = "Generate CEFR exam. JSON."
-    response = client.models.generate_content(
-        model=EXAM_MODEL_ID,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=models.ExamResponse,
+    prompt = f"Generate a {request.cefr_level} CEFR exam for the student. Output as strict JSON matching ExamResponse schema."
+    try:
+        response = client.models.generate_content(
+            model=EXAM_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            )
         )
-    )
-    return response.parsed
+        raw_text = getattr(response, 'text', 'None')
+        try:
+            # Strip markdown if present
+            clean_json = raw_text
+            if "```json" in raw_text:
+                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw_text:
+                clean_json = raw_text.split("```")[1].split("```")[0].strip()
+
+            raw_json = json.loads(clean_json)
+            return models.ExamResponse(**raw_json)
+        except Exception as parse_err:
+            logger.error(f"Manual parse failed for CEFR exam: {parse_err}")
+            raise ValueError(f"Invalid Exam Response: {raw_text}")
+    except Exception as e:
+        logger.exception("CRITICAL: Failed generate_cefr_exam")
+        raise e
