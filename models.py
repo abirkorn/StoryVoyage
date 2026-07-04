@@ -47,8 +47,11 @@ class ActBlueprint(BaseModel):
     branch_options: List[str] = Field(default_factory=list)
 
 class StoryArc(BaseModel):
-    title: str
-    acts: List[ActBlueprint]
+    title: str = Field(..., description="The catchy title of the story arc")
+    hero_id: str = Field(..., description="The ID of the hero this arc is about")
+    setting_id: str = Field(..., description="The ID of the setting where this arc takes place")
+    catalyst_id: str = Field(..., description="The ID of the catalyst that starts this arc")
+    acts: List[ActBlueprint] = Field(..., description="The 3 acts of the story")
 
 class AdventureSetupResponse(BaseModel):
     heroes: List[LaunchpadAnchor] = Field(default_factory=list)

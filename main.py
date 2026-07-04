@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +9,15 @@ import llm_service
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Global Logging Configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 
 app = FastAPI(title="Adaptive English Learning API")
 
