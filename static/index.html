@@ -302,15 +302,14 @@
             const arc = gState.lastLaunchData.potential_story_arcs[arcIndex];
             const data = gState.lastLaunchData;
 
-            // Map the arc to specific hero/setting/catalyst if embedded logic allows,
-            // but for sandbox let's just pick indices based on arc index modulo 3
-            const hIdx = arcIndex % 3;
-            const sIdx = (arcIndex + 1) % 3;
+            // Map the arc to specific hero/setting/catalyst using IDs
+            const hero = data.heroes.find(h => h.id === arc.hero_id) || data.heroes[0];
+            const setting = data.settings.find(s => s.id === arc.setting_id) || data.settings[0];
 
             document.getElementById('actStoryTitle').value = arc.title;
             document.getElementById('actGenre').value = document.getElementById('launchGenre').value;
-            document.getElementById('actHeroDesc').value = data.heroes[hIdx].description;
-            document.getElementById('actSettingDesc').value = data.settings[sIdx].description;
+            document.getElementById('actHeroDesc').value = hero.description;
+            document.getElementById('actSettingDesc').value = setting.description;
             document.getElementById('actPrev').value = "";
             document.getElementById('actNext').value = arc.acts[1].title;
 
@@ -442,6 +441,10 @@
             const arc = gState.arc;
             const lData = gState.lastLaunchData;
             const actIdx = gState.act - 1;
+
+            const hero = lData.heroes.find(h => h.id === arc.hero_id) || lData.heroes[0];
+            const setting = lData.settings.find(s => s.id === arc.setting_id) || lData.settings[0];
+
             const body = {
                 story_arc_title: arc.title,
                 act_blueprint: arc.acts[actIdx],
@@ -449,8 +452,8 @@
                 target_words: lData.selected_vocabulary.slice(actIdx * 10, (actIdx + 1) * 10 + 10),
                 student_state: { current_estimated_level: 'A1-Sub1' },
                 word_count_target: 150,
-                hero_description: lData.heroes[0].description,
-                setting_description: lData.settings[0].description,
+                hero_description: hero.description,
+                setting_description: setting.description,
                 genre: document.getElementById('launchGenre').value,
                 previous_act_title: actIdx > 0 ? arc.acts[actIdx-1].title : null,
                 next_act_title: actIdx < 4 ? arc.acts[actIdx+1].title : null
