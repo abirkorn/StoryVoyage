@@ -14,209 +14,216 @@
             font-family: 'Consolas', 'Monaco', monospace;
             white-space: pre-wrap;
             font-size: 0.75rem;
-            max-height: 350px;
+            max-height: 400px;
             overflow-y: auto;
         }
         .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-900 text-sm">
+<body class="bg-gray-50 min-h-screen text-gray-900">
     <div class="max-w-7xl mx-auto p-4">
         <header class="flex justify-between items-center mb-6 border-b pb-4">
             <h1 class="text-2xl font-bold text-blue-700">StoryVoyage Wizard Sandbox</h1>
             <div class="flex gap-4">
-                <input type="text" id="appToken" value="super-secret-token" class="border p-1 rounded w-48" placeholder="X-App-Token">
+                <input type="text" id="appToken" value="super-secret-token" class="border p-1 rounded text-sm w-48" placeholder="X-App-Token">
             </div>
         </header>
 
         <!-- Navigation Tabs -->
-        <nav class="flex gap-8 mb-6 border-b overflow-x-auto">
-            <button onclick="showTab('launchpad')" id="tab-launchpad" class="pb-2 px-1 font-medium transition-all tab-active whitespace-nowrap">Tab 0: Launchpad</button>
-            <button onclick="showTab('wizard')" id="tab-wizard" class="pb-2 px-1 font-medium transition-all whitespace-nowrap">Tab A: Wizard</button>
-            <button onclick="showTab('act')" id="tab-act" class="pb-2 px-1 font-medium transition-all whitespace-nowrap">Tab C: Act Generator</button>
-            <button onclick="showTab('validation')" id="tab-validation" class="pb-2 px-1 font-medium transition-all whitespace-nowrap">Tab D: Validation</button>
-            <button onclick="showTab('unified')" id="tab-unified" class="pb-2 px-1 font-medium transition-all text-purple-600 whitespace-nowrap">Unified Flow</button>
+        <nav class="flex gap-8 mb-6 border-b">
+            <button onclick="showTab('wizard')" id="tab-wizard" class="pb-2 px-1 text-sm font-medium transition-all tab-active">Tab A: Onboarding Wizard</button>
+            <button onclick="showTab('arc')" id="tab-arc" class="pb-2 px-1 text-sm font-medium transition-all">Tab B: Story Arc Builder</button>
+            <button onclick="showTab('act')" id="tab-act" class="pb-2 px-1 text-sm font-medium transition-all">Tab C: Act Content Generator</button>
+            <button onclick="showTab('validation')" id="tab-validation" class="pb-2 px-1 text-sm font-medium transition-all">Tab D: Inline Validation</button>
+            <button onclick="showTab('unified')" id="tab-unified" class="pb-2 px-1 text-sm font-medium transition-all text-purple-600">Unified E2E Flow</button>
         </nav>
 
+        <!-- Common Global State (Sidebar-like) -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
 
             <div class="lg:col-span-3">
 
-                <!-- Tab: Launchpad -->
-                <div id="view-launchpad" class="space-y-4">
-                    <div class="bg-white p-6 rounded-lg shadow-sm border">
-                        <h2 class="text-lg font-bold mb-4">Adventure Launchpad Builder</h2>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                            <div class="col-span-2">
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Genre</label>
-                                <select id="launchGenre" class="w-full border p-2 rounded">
-                                    <option value="Fantasy & Magic">Fantasy & Magic</option>
-                                    <option value="Adventure & Exploration">Adventure & Exploration</option>
-                                    <option value="Sci-Fi & Space">Sci-Fi & Space</option>
-                                    <option value="Mystery & Detective">Mystery & Detective</option>
-                                    <option value="Everyday Magic / Magical Realism">Everyday Magic / Magical Realism</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Rank Index</label>
-                                <input type="number" id="launchRank" value="100" class="w-full border p-2 rounded">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Word Count</label>
-                                <input type="number" id="launchCount" value="100" class="w-full border p-2 rounded">
-                            </div>
-                            <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Fraction Above (0.1 = 10%)</label>
-                                <input type="number" step="0.01" id="launchPct" value="0.10" class="w-full border p-2 rounded">
-                            </div>
-                        </div>
-                        <button onclick="setupAdventure()" id="launchBtn" class="bg-blue-600 text-white px-6 py-2 rounded font-medium w-full hover:bg-blue-700">Generate Options</button>
-                        <div id="launchResult" class="mt-8 space-y-4 hidden">
-                            <div class="flex justify-end">
-                                <button onclick="applyGuardrails()" id="guardBtn" class="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-orange-600">Apply Post-hoc Guardrails 🛡️</button>
-                            </div>
-                            <div class="grid grid-cols-3 gap-2 text-xs">
-                                <div class="p-2 border bg-blue-50"><b>Heroes:</b> <ul id="listHeroes" class="italic"></ul></div>
-                                <div class="p-2 border bg-green-50"><b>Settings:</b> <ul id="listSettings" class="italic"></ul></div>
-                                <div class="p-2 border bg-purple-50"><b>Catalysts:</b> <ul id="listCatalysts" class="italic"></ul></div>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-gray-700 mb-1 uppercase text-xs">
-                                    Words Sent to LLM (Rank Range: <span id="rankRange">0-0</span>):
-                                </h3>
-                                <div id="launchWords" class="text-[10px] text-gray-500 flex flex-wrap gap-2 p-2 bg-gray-100 rounded border"></div>
-                            </div>
-                            <div class="json-inspector" id="launchJson"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tab: Wizard -->
-                <div id="view-wizard" class="hidden space-y-4">
+                <!-- Tab A: Wizard -->
+                <div id="view-wizard" class="space-y-4">
                     <div class="bg-white p-6 rounded-lg shadow-sm border h-[600px] flex flex-col">
-                        <h2 class="text-lg font-bold mb-4">Onboarding Wizard</h2>
-                        <div id="chatBox" class="flex-grow overflow-y-auto space-y-3 mb-4 p-4 bg-gray-100 rounded border italic"></div>
+                        <h2 class="text-lg font-bold mb-4">Onboarding Wizard Playground</h2>
+                        <div id="chatBox" class="flex-grow overflow-y-auto space-y-3 mb-4 p-4 bg-gray-100 rounded border italic">
+                            <div class="text-gray-500">Say "Hi" to start the onboarding...</div>
+                        </div>
                         <div class="flex gap-2">
                             <input type="text" id="chatInput" placeholder="Type here..." class="flex-grow border p-2 rounded">
                             <button onclick="sendWizardChat()" class="bg-blue-600 text-white px-6 py-2 rounded font-medium">Send</button>
                         </div>
                         <div id="wizardDecision" class="mt-4 hidden">
+                            <h3 class="text-green-600 font-bold text-sm mb-2">Final Decision Received!</h3>
                             <div id="wizardDecisionJson" class="json-inspector"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tab: Act Generator -->
+                <!-- Tab B: Story Arc Builder -->
+                <div id="view-arc" class="hidden space-y-4">
+                    <div class="bg-white p-6 rounded-lg shadow-sm border">
+                        <h2 class="text-lg font-bold mb-4">Isolated Story Arc Builder</h2>
+                        <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                            <div>
+                                <label class="block font-medium">Hero Name</label>
+                                <input type="text" id="arcHero" value="Leo" class="w-full border p-2 rounded">
+                            </div>
+                            <div>
+                                <label class="block font-medium">Setting</label>
+                                <input type="text" id="arcSetting" value="Mars Colony" class="w-full border p-2 rounded">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block font-medium">Goal</label>
+                                <input type="text" id="arcGoal" value="Find the ancient water crystal" class="w-full border p-2 rounded">
+                            </div>
+                        </div>
+                        <button onclick="buildArc()" id="buildArcBtn" class="bg-purple-600 text-white px-6 py-2 rounded font-medium w-full">Generate 5-Act Blueprint</button>
+                        <div id="arcResult" class="mt-6 hidden">
+                            <h3 class="font-bold mb-2">Story Arc Blueprint (JSON):</h3>
+                            <div id="arcJson" class="json-inspector"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab C: Act Content -->
                 <div id="view-act" class="hidden space-y-4">
                     <div class="bg-white p-6 rounded-lg shadow-sm border">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-bold">Isolated Act Generator</h2>
-                            <div class="flex gap-2">
-                                <button onclick="loadToyExample()" class="bg-gray-200 px-3 py-1 rounded text-xs">Toy Example</button>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                            <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Story Title</label>
-                                <input type="text" id="actStoryTitle" class="w-full border p-2 rounded text-xs">
-                            </div>
-                            <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Word Count Target</label>
-                                <input type="number" id="actWordCount" value="100" class="w-full border p-2 rounded text-xs">
-                            </div>
-                            <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Genre</label>
-                                <input type="text" id="actGenre" class="w-full border p-2 rounded text-xs">
-                            </div>
-                            <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Hero Desc</label>
-                                <input type="text" id="actHeroDesc" class="w-full border p-2 rounded text-xs">
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Prev Act</label>
-                                <input type="text" id="actPrev" class="w-full border p-2 rounded text-xs">
+                        <h2 class="text-lg font-bold mb-4">Isolated Act Content Generator</h2>
+                        <div class="grid grid-cols-3 gap-4 mb-4 text-sm">
+                            <div class="col-span-3">
+                                <label class="block font-medium">Story Arc JSON (Paste here)</label>
+                                <textarea id="actArcInput" rows="6" class="w-full border p-2 rounded font-mono text-xs" placeholder='{"story_title": "...}'></textarea>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Setting Desc</label>
-                                <input type="text" id="actSettingDesc" class="w-full border p-2 rounded text-xs">
+                                <label class="block font-medium">Act Number</label>
+                                <select id="actNumInput" class="w-full border p-2 rounded">
+                                    <option value="1">Act 1</option>
+                                    <option value="2">Act 2</option>
+                                    <option value="3">Act 3</option>
+                                    <option value="4">Act 4</option>
+                                    <option value="5">Act 5</option>
+                                </select>
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Next Act</label>
-                                <input type="text" id="actNext" class="w-full border p-2 rounded text-xs">
+                            <div class="col-span-2">
+                                <label class="block font-medium">Mock Target Words (Comma separated)</label>
+                                <input type="text" id="actWordsInput" value="oxygen, crater, galaxy" class="w-full border p-2 rounded">
                             </div>
                         </div>
-                        <label class="block text-xs font-bold uppercase text-gray-400">Act Blueprint (JSON)</label>
-                        <textarea id="actBlueprintInput" rows="6" class="w-full border p-2 rounded text-xs font-mono mb-2" placeholder='{"act_number": 1, "title": "Start", "starting_point": "Home", "ending_point": "Forest", "description": "Leo leaves home.", "branch_options": ["Enter forest", "Run away"]}'></textarea>
-
-                        <label class="block text-xs font-bold uppercase text-gray-400">Vocabulary Pool (comma separated)</label>
-                        <textarea id="actWordsInput" rows="2" class="w-full border p-2 rounded mb-4 text-xs" placeholder="magic, moon, adventure..."></textarea>
-
-                        <button onclick="generateActProse()" id="genActBtn" class="bg-green-600 text-white px-6 py-2 rounded font-medium w-full">Generate Prose</button>
-
-                        <div id="actResult" class="mt-4 hidden space-y-2">
-                            <div id="actUsedWords" class="flex flex-wrap gap-2 mb-2"></div>
-                            <div id="actSceneText" class="p-3 bg-blue-50 border rounded italic"></div>
+                        <button onclick="generateActProse()" id="genActBtn" class="bg-green-600 text-white px-6 py-2 rounded font-medium w-full">Generate Act Prose</button>
+                        <div id="actResult" class="mt-6 hidden space-y-4">
+                            <div>
+                                <h3 class="font-bold text-sm text-blue-600 uppercase">Scene Text (English):</h3>
+                                <p id="actSceneText" class="p-3 bg-blue-50 border rounded italic"></p>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm text-gray-600 uppercase">Remedial Text (Hebrew):</h3>
+                                <p id="actRemedialText" class="p-3 bg-gray-50 border rounded"></p>
+                            </div>
                             <div id="actProseJson" class="json-inspector"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tab: Validation -->
+                <!-- Tab D: Validation -->
                 <div id="view-validation" class="hidden space-y-4">
                     <div class="bg-white p-6 rounded-lg shadow-sm border">
-                        <h2 class="text-lg font-bold mb-4">Isolated Validation (Step D)</h2>
-                        <textarea id="valSubmissionInput" rows="6" class="w-full border p-2 rounded text-xs font-mono mb-2" placeholder='{"answers": {"q1": 0}, "correct_answers": {"q1": 0}}'></textarea>
-                        <button onclick="testValidation()" class="bg-orange-600 text-white px-6 py-2 rounded font-medium w-full">Evaluate</button>
-                        <div id="valResult" class="mt-4"><div id="valJson" class="json-inspector"></div></div>
+                        <h2 class="text-lg font-bold mb-4">Tab D: Isolated Validation Playground</h2>
+                        <div class="grid grid-cols-1 gap-4 mb-4 text-sm">
+                            <div>
+                                <label class="block font-medium text-blue-700 uppercase text-xs">Simulated Submission JSON</label>
+                                <textarea id="valSubmissionInput" rows="8" class="w-full border p-2 rounded font-mono text-xs" placeholder='{"student_state": {...}, "answers": {"q1": 0}, "correct_answers": {"q1": 0}}'></textarea>
+                            </div>
+                        </div>
+                        <button onclick="testValidation()" id="valTestBtn" class="bg-blue-600 text-white px-6 py-2 rounded font-medium w-full">Test /evaluate-assessment</button>
+                        <div id="valResult" class="mt-6 hidden">
+                            <h3 class="font-bold mb-2 text-sm uppercase text-gray-500">Pedagogical Feedback:</h3>
+                            <div id="valJson" class="json-inspector"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tab: Unified Flow -->
+                <!-- Tab E: Unified Flow -->
                 <div id="view-unified" class="hidden space-y-6">
                     <div class="bg-purple-50 p-6 rounded-lg border-2 border-purple-200 shadow-lg">
-                        <h2 class="text-xl font-bold mb-6 text-purple-800">Unified E2E Flow</h2>
-                        <div id="u-step-launch" class="mb-8">
-                            <h3 class="font-bold mb-2">Step 0: Setup Adventure</h3>
+                        <h2 class="text-xl font-bold mb-6 text-purple-800">Unified E2E Story Voyage</h2>
+
+                        <!-- Step 1: Onboarding -->
+                        <div id="u-step-1" class="mb-8">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">1</div>
+                                <h3 class="text-lg font-semibold">Wizard Onboarding</h3>
+                            </div>
+                            <div id="u-chat" class="h-48 overflow-y-auto bg-white border p-4 rounded mb-2 text-sm italic"></div>
                             <div class="flex gap-2">
-                                <input type="number" id="u-rank" value="100" class="border p-2 rounded w-24">
-                                <button onclick="u_setup()" class="bg-blue-600 text-white px-4 py-2 rounded">Setup</button>
+                                <input type="text" id="u-input" class="flex-grow border p-2 rounded" placeholder="Respond to the wizard...">
+                                <button onclick="sendUnifiedChat()" class="bg-purple-600 text-white px-4 py-2 rounded">Send</button>
                             </div>
                         </div>
-                        <div id="u-step-wizard" class="mb-8 opacity-50 pointer-events-none">
-                            <h3 class="font-bold mb-2">Step 1: Wizard</h3>
-                            <div id="u-chat" class="h-40 overflow-y-auto bg-white border p-4 rounded mb-2 italic"></div>
-                            <div class="flex gap-2">
-                                <input type="text" id="u-input" class="flex-grow border p-2 rounded" placeholder="Respond...">
-                                <button onclick="u_sendChat()" class="bg-purple-600 text-white px-4 py-2 rounded">Send</button>
+
+                        <!-- Step 2: Arc -->
+                        <div id="u-step-2" class="mb-8 opacity-50 pointer-events-none transition-all">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">2</div>
+                                <h3 class="text-lg font-semibold">Generate Story Arc</h3>
                             </div>
+                            <button onclick="u_buildArc()" id="u-build-btn" class="bg-blue-600 text-white px-6 py-2 rounded w-full">Create Blueprint</button>
                         </div>
-                        <div id="u-step-game" class="opacity-50 pointer-events-none">
-                            <h3 class="font-bold mb-2">Step 2: Adventure</h3>
-                            <div id="u-game-area" class="bg-white p-4 rounded border min-h-[100px] mb-4 italic text-gray-600">Waiting for Wizard...</div>
-                            <div id="u-assessment" class="hidden space-y-2">
-                                <p id="u-question" class="font-bold"></p>
-                                <div id="u-options" class="space-y-1"></div>
-                                <button onclick="u_submit()" class="bg-green-600 text-white px-4 py-2 rounded w-full">Submit Answer</button>
+
+                        <!-- Step 3: Acts -->
+                        <div id="u-step-3" class="opacity-50 pointer-events-none transition-all">
+                            <div class="flex items-center gap-2 mb-4">
+                                <div class="bg-purple-600 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">3</div>
+                                <h3 class="text-lg font-semibold">Live Story Gameplay</h3>
                             </div>
-                            <div id="u-feedback" class="mt-2 text-blue-700 italic"></div>
-                            <button id="u-next" onclick="u_next()" class="hidden mt-4 bg-purple-600 text-white px-6 py-2 rounded w-full">Next Act ➔</button>
+                            <div id="u-current-act-info" class="mb-4 text-center font-bold text-purple-700 bg-white p-2 rounded border">Act 1: Waiting to Start</div>
+                            <div id="u-gameplay-area" class="space-y-4">
+                                <div class="bg-white p-4 rounded border min-h-[150px]">
+                                    <p id="u-scene-text" class="italic text-gray-500 text-center py-8">Prose will appear here...</p>
+                                </div>
+                                <div id="u-assessment" class="bg-yellow-50 p-4 rounded border hidden">
+                                    <h4 class="font-bold mb-2">Check Your Understanding:</h4>
+                                    <div id="u-question" class="text-sm mb-4"></div>
+                                    <div id="u-options" class="space-y-2 mb-4"></div>
+                                    <button id="u-submit-btn" onclick="u_submitAssessment()" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Submit Answer</button>
+                                </div>
+                                <div id="u-feedback" class="bg-green-50 p-4 rounded border hidden text-sm italic"></div>
+                                <button id="u-next-btn" onclick="u_nextAct()" class="bg-green-600 text-white px-6 py-3 rounded w-full font-bold hidden">Next Act ➔</button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
             </div>
 
-            <!-- Global State -->
+            <!-- Global State Inspector (Right Column) -->
             <div class="lg:col-span-1 space-y-4">
                 <div class="bg-white p-4 rounded-lg shadow-sm border">
-                    <h2 class="font-bold uppercase text-gray-500 mb-2 text-xs">Global State</h2>
-                    <div class="space-y-1 text-xs">
-                        <p>Rank: <span id="s-rank" class="font-bold">100</span></p>
-                        <p>Hero: <span id="s-hero" class="font-bold italic">None</span></p>
-                        <p>Act: <span id="s-act" class="font-bold">1</span></p>
+                    <h2 class="text-sm font-bold uppercase text-gray-500 mb-2">Student State Simulator</h2>
+                    <div class="space-y-3 text-xs">
+                        <div>
+                            <label class="font-medium">CEFR Level</label>
+                            <select id="stateLevel" class="w-full border p-1 rounded" onchange="globalStudentState.current_estimated_level = this.value">
+                                <option value="unknown">unknown</option>
+                                <option value="A1-Sub1">A1-Sub1</option>
+                                <option value="A1-Sub2">A1-Sub2</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-medium">History (Turns)</label>
+                            <div id="stateHistoryCount" class="font-bold">0</div>
+                        </div>
+                        <div class="pt-2 border-t">
+                            <label class="font-medium">Captured Elements</label>
+                            <div id="stateElements" class="text-blue-600 italic">None</div>
+                        </div>
                     </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow-sm border">
+                    <h2 class="text-sm font-bold uppercase text-gray-500 mb-2">Internal Story Arc</h2>
+                    <div id="globalArcJson" class="json-inspector h-[300px] text-[10px]">Empty</div>
                 </div>
             </div>
 
@@ -225,34 +232,29 @@
 
     <script>
         let wizardHistory = [];
-        let gState = { rank: 100, elements: null, arc: null, act: 1, lastActData: null, lastLaunchData: null };
+        let globalStudentState = { current_estimated_level: 'unknown', covered_categories: {}, assessment_history: [], story_preferences: {}, total_scenes_completed: 0 };
+        let globalStoryElements = null;
+        let globalStoryArc = null;
+        let currentActNumber = 1;
+        let lastActData = null;
 
         async function apiCall(endpoint, body) {
-            console.log(`[API Call] -> ${endpoint}`, body);
             const token = document.getElementById('appToken').value;
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-App-Token': token },
-                    body: JSON.stringify(body)
-                });
-                if (!response.ok) {
-                    const errText = await response.text();
-                    console.error(`[API Error] ${response.status}: ${errText}`);
-                    alert(`Error: ${response.status} - ${errText}`);
-                    throw new Error(errText);
-                }
-                const data = await response.json();
-                console.log(`[API Response] <- ${endpoint}`, data);
-                return data;
-            } catch (e) {
-                console.error(`[Fetch Failed] ${e}`);
-                throw e;
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-App-Token': token },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                alert(`Error: ${err.detail || response.statusText}`);
+                throw new Error(err.detail);
             }
+            return await response.json();
         }
 
         function showTab(id) {
-            ['launchpad', 'wizard', 'act', 'validation', 'unified'].forEach(t => {
+            ['wizard', 'arc', 'act', 'validation', 'unified'].forEach(t => {
                 document.getElementById('view-' + t).classList.add('hidden');
                 document.getElementById('tab-' + t).classList.remove('tab-active');
             });
@@ -260,224 +262,186 @@
             document.getElementById('tab-' + id).classList.add('tab-active');
         }
 
-        async function setupAdventure() {
-            const btn = document.getElementById('launchBtn');
-            btn.disabled = true; btn.innerText = "Building...";
-            const body = {
-                rank_index: parseInt(document.getElementById('launchRank').value),
-                genre: document.getElementById('launchGenre').value,
-                num_words: parseInt(document.getElementById('launchCount').value),
-                pct_above: parseFloat(document.getElementById('launchPct').value)
-            };
-            try {
-                const data = await apiCall('/adventure/setup', body);
-                document.getElementById('launchResult').classList.remove('hidden');
-
-                document.getElementById('listHeroes').innerHTML = data.heroes.map(h => `<li>${h.text}</li>`).join('');
-                document.getElementById('listSettings').innerHTML = data.settings.map(s => `<li>${s.text}</li>`).join('');
-                document.getElementById('listCatalysts').innerHTML = data.catalysts.map(c => `<li>${c.text}</li>`).join('');
-                document.getElementById('launchWords').innerHTML = data.selected_vocabulary.map(w => `<span class='bg-white px-1 border rounded'>${w}</span>`).join('');
-                document.getElementById('rankRange').innerText = `${data.vocabulary_min_rank}-${data.vocabulary_max_rank}`;
-
-                // Add "Generate Act" buttons for each arc
-                const arcList = data.potential_story_arcs.map((arc, i) => `
-                    <div class="p-2 border rounded bg-white flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-xs">${arc.title}</p>
-                            <p class="text-[10px] text-gray-500">${arc.acts[0].description}...</p>
-                        </div>
-                        <button onclick="sendToActGenerator(${i})" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Pick & Generate Act 1</button>
-                    </div>
-                `).join('');
-                document.getElementById('launchResult').classList.remove('hidden');
-                document.getElementById('launchJson').innerHTML = `<div class="space-y-2 mb-4">${arcList}</div>` + `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-
-                gState.rank = body.rank_index;
-                gState.lastLaunchData = data;
-                document.getElementById('s-rank').innerText = gState.rank;
-            } catch (e) {} finally { btn.disabled = false; btn.innerText = "Generate Options"; }
-        }
-
-        function sendToActGenerator(arcIndex) {
-            const arc = gState.lastLaunchData.potential_story_arcs[arcIndex];
-            const data = gState.lastLaunchData;
-
-            // Map the arc to specific hero/setting/catalyst using IDs
-            const hero = data.heroes.find(h => h.id === arc.hero_id) || data.heroes[0];
-            const setting = data.settings.find(s => s.id === arc.setting_id) || data.settings[0];
-
-            document.getElementById('actStoryTitle').value = arc.title;
-            document.getElementById('actGenre').value = document.getElementById('launchGenre').value;
-            document.getElementById('actHeroDesc').value = hero.description;
-            document.getElementById('actSettingDesc').value = setting.description;
-            document.getElementById('actPrev').value = "";
-            document.getElementById('actNext').value = arc.acts[1].title;
-
-            document.getElementById('actBlueprintInput').value = JSON.stringify(arc.acts[0], null, 2);
-            // Send a pool of 25 words
-            document.getElementById('actWordsInput').value = data.selected_vocabulary.slice(0, 25).join(', ');
-            showTab('act');
-        }
-
-        function loadToyExample() {
-            const toy = {
-                act_number: 1,
-                title: "The Mysterious Discovery",
-                starting_point: "Leo is bored in his room.",
-                ending_point: "Leo finds a glowing map under his bed.",
-                description: "The hero discovers the inciting incident.",
-                branch_options: ["Check the map", "Hide it"]
-            };
-            document.getElementById('actStoryTitle').value = "Sample Adventure";
-            document.getElementById('actGenre').value = "Mystery";
-            document.getElementById('actHeroDesc').value = "Leo - a curious boy";
-            document.getElementById('actSettingDesc').value = "A dusty attic";
-            document.getElementById('actPrev').value = "";
-            document.getElementById('actNext').value = "The Forbidden Gate";
-            document.getElementById('actBlueprintInput').value = JSON.stringify(toy, null, 2);
-            document.getElementById('actWordsInput').value = "magic, glowing, map, secret, dusty";
-        }
-
-        async function applyGuardrails() {
-            const btn = document.getElementById('guardBtn');
-            btn.disabled = true; btn.innerText = "🛡️ Guarding...";
-            try {
-                const data = await apiCall('/adventure/apply-guardrails', { data: gState.lastLaunchData, target_rank: gState.rank });
-                document.getElementById('launchJson').innerText = JSON.stringify(data, null, 2);
-                document.getElementById('listHeroes').innerHTML = data.heroes.map(h => `<li>${h.text}</li>`).join('');
-                document.getElementById('listSettings').innerHTML = data.settings.map(s => `<li>${s.text}</li>`).join('');
-                document.getElementById('listCatalysts').innerHTML = data.catalysts.map(c => `<li>${c.text}</li>`).join('');
-                alert("Guardrails applied! Descriptions simplified where needed.");
-            } catch (e) {} finally { btn.disabled = false; btn.innerText = "Apply Post-hoc Guardrails 🛡️"; }
-        }
-
+        // --- Tab A: Wizard ---
         async function sendWizardChat() {
             const input = document.getElementById('chatInput');
-            const text = input.value.trim(); if (!text) return;
+            const text = input.value.trim();
+            if (!text) return;
+
             appendChat('chatBox', 'user', text);
             input.value = '';
+
             try {
-                const data = await apiCall('/interview-chat', { message: text, history: wizardHistory, student_state: { current_estimated_level: 'unknown', current_rank_index: gState.rank } });
+                const data = await apiCall('/interview-chat', { message: text, history: wizardHistory, student_state: globalStudentState });
                 if (data.is_final_turn) {
-                    appendChat('chatBox', 'ai', "<b>Setup Complete!</b>");
+                    appendChat('chatBox', 'ai', "<b>Setup Complete!</b> Check the result below.");
                     document.getElementById('wizardDecision').classList.remove('hidden');
                     document.getElementById('wizardDecisionJson').innerText = JSON.stringify(data.pedagogical_decision, null, 2);
-                    gState.elements = data.pedagogical_decision.story_elements;
-                    document.getElementById('s-hero').innerText = gState.elements.hero_name;
+                    globalStoryElements = data.pedagogical_decision.story_elements;
+                    document.getElementById('stateElements').innerText = globalStoryElements.hero_name + " in " + globalStoryElements.setting;
                 } else {
                     appendChat('chatBox', 'ai', data.chat_response);
+                    wizardHistory.push({ role: 'user', content: text });
+                    wizardHistory.push({ role: 'model', content: data.chat_response });
+                    document.getElementById('stateHistoryCount').innerText = wizardHistory.length / 2;
+                }
+            } catch (e) {}
+        }
+
+        function appendChat(boxId, role, text) {
+            const box = document.getElementById(boxId);
+            const div = document.createElement('div');
+            div.className = `p-2 rounded ${role === 'user' ? 'bg-blue-100 ml-8' : 'bg-white mr-8 border'}`;
+            div.innerHTML = `<strong>${role === 'user' ? 'You' : 'AI'}:</strong> ${text}`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // --- Tab B: Arc Builder ---
+        async function buildArc() {
+            if (!globalStoryElements) {
+                globalStoryElements = { hero_name: document.getElementById('arcHero').value, setting: document.getElementById('arcSetting').value, goal: document.getElementById('arcGoal').value };
+            }
+            const btn = document.getElementById('buildArcBtn');
+            btn.disabled = true; btn.innerText = "Architecting...";
+
+            try {
+                const data = await apiCall('/story/generate-arc', { story_elements: globalStoryElements, student_state: globalStudentState });
+                globalStoryArc = data;
+                document.getElementById('arcResult').classList.remove('hidden');
+                document.getElementById('arcJson').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('globalArcJson').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('actArcInput').value = JSON.stringify(data, null, 2);
+            } catch (e) {} finally { btn.disabled = false; btn.innerText = "Generate 5-Act Blueprint"; }
+        }
+
+        // --- Tab C: Act Content ---
+        async function generateActProse() {
+            const arc = JSON.parse(document.getElementById('actArcInput').value);
+            const actNum = parseInt(document.getElementById('actNumInput').value);
+            const words = document.getElementById('actWordsInput').value.split(',').map(w => w.trim());
+
+            const btn = document.getElementById('genActBtn');
+            btn.disabled = true; btn.innerText = "Writing Prose...";
+
+            try {
+                const data = await apiCall('/story/generate-act-content', { story_arc: arc, act_number: actNum, target_words: words, student_state: globalStudentState });
+                document.getElementById('actResult').classList.remove('hidden');
+                document.getElementById('actSceneText').innerText = data.scene_text;
+                document.getElementById('actRemedialText').innerText = data.remedial_scene_text;
+                document.getElementById('actProseJson').innerText = JSON.stringify(data, null, 2);
+            } catch (e) {} finally { btn.disabled = false; btn.innerText = "Generate Act Prose"; }
+        }
+
+        // --- Tab D: Validation ---
+        async function testValidation() {
+            const input = document.getElementById('valSubmissionInput').value;
+            try {
+                const body = JSON.parse(input);
+                const btn = document.getElementById('valTestBtn');
+                btn.disabled = true; btn.innerText = "Validating...";
+                const data = await apiCall('/evaluate-assessment', body);
+                document.getElementById('valResult').classList.remove('hidden');
+                document.getElementById('valJson').innerText = JSON.stringify(data, null, 2);
+            } catch (e) { alert("Invalid JSON input!"); } finally {
+                const btn = document.getElementById('valTestBtn');
+                btn.disabled = false; btn.innerText = "Test /evaluate-assessment";
+            }
+        }
+
+        // --- Tab E: Unified ---
+        async function sendUnifiedChat() {
+            const input = document.getElementById('u-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            appendChat('u-chat', 'user', text);
+            input.value = '';
+
+            try {
+                const data = await apiCall('/interview-chat', { message: text, history: wizardHistory, student_state: globalStudentState });
+                if (data.is_final_turn) {
+                    appendChat('u-chat', 'ai', "<b>Ready! Let's build the blueprint.</b>");
+                    globalStoryElements = data.pedagogical_decision.story_elements;
+                    document.getElementById('u-step-2').classList.remove('opacity-50', 'pointer-events-none');
+                } else {
+                    appendChat('u-chat', 'ai', data.chat_response);
                     wizardHistory.push({ role: 'user', content: text });
                     wizardHistory.push({ role: 'model', content: data.chat_response });
                 }
             } catch (e) {}
         }
 
-        function appendChat(id, role, text) {
-            const div = document.createElement('div');
-            div.className = `p-2 rounded ${role === 'user' ? 'bg-blue-100 ml-8' : 'bg-white mr-8 border'}`;
-            div.innerHTML = `<strong>${role==='user'?'You':'AI'}:</strong> ${text}`;
-            document.getElementById(id).appendChild(div);
-            document.getElementById(id).scrollTop = document.getElementById(id).scrollHeight;
+        async function u_buildArc() {
+            const btn = document.getElementById('u-build-btn');
+            btn.innerText = "Architecting Arc..."; btn.disabled = true;
+            try {
+                const data = await apiCall('/story/generate-arc', { story_elements: globalStoryElements, student_state: globalStudentState });
+                globalStoryArc = data;
+                document.getElementById('globalArcJson').innerText = JSON.stringify(data, null, 2);
+                document.getElementById('u-step-3').classList.remove('opacity-50', 'pointer-events-none');
+                u_playAct();
+            } catch (e) {} finally { btn.innerText = "Blueprint Created"; }
         }
 
-        async function generateActProse() {
-            const btn = document.getElementById('genActBtn'); btn.disabled = true;
+        async function u_playAct() {
+            document.getElementById('u-current-act-info').innerText = `Generating Act ${currentActNumber}...`;
             try {
-                const body = {
-                    story_arc_title: document.getElementById('actStoryTitle').value,
-                    act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
-                    target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()).filter(w => w),
-                    student_state: { current_estimated_level: 'A1-Sub1' },
-                    word_count_target: parseInt(document.getElementById('actWordCount').value),
-                    hero_description: document.getElementById('actHeroDesc').value,
-                    setting_description: document.getElementById('actSettingDesc').value,
-                    genre: document.getElementById('actGenre').value,
-                    previous_act_title: document.getElementById('actPrev').value,
-                    next_act_title: document.getElementById('actNext').value
-                };
-                const data = await apiCall('/story/generate-act-content', body);
-                document.getElementById('actResult').classList.remove('hidden');
-                document.getElementById('actSceneText').innerText = data.scene_text;
-                document.getElementById('actUsedWords').innerHTML = data.used_vocabulary.map(w => `<span class='bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold'>${w}</span>`).join('');
-                document.getElementById('actProseJson').innerText = JSON.stringify(data, null, 2);
-            } catch (e) {} finally { btn.disabled = false; }
-        }
+                const data = await apiCall('/story/generate-act-content', { story_arc: globalStoryArc, act_number: currentActNumber, target_words: ["magic", "friendship"], student_state: globalStudentState });
+                lastActData = data;
+                document.getElementById('u-current-act-info').innerText = `Act ${currentActNumber}: ${globalStoryArc.acts[currentActNumber-1].title}`;
+                document.getElementById('u-scene-text').innerText = data.scene_text;
+                document.getElementById('u-assessment').classList.remove('hidden');
+                document.getElementById('u-question').innerText = data.assessment_tasks.comprehension_question.question_text_hebrew;
 
-        async function testValidation() {
-            try {
-                const data = await apiCall('/evaluate-assessment', JSON.parse(document.getElementById('valSubmissionInput').value));
-                document.getElementById('valJson').innerText = JSON.stringify(data, null, 2);
+                const options = document.getElementById('u-options');
+                options.innerHTML = '';
+                data.assessment_tasks.comprehension_question.options_hebrew.forEach((opt, idx) => {
+                    options.innerHTML += `
+                        <label class="block p-2 border rounded cursor-pointer hover:bg-gray-50">
+                            <input type="radio" name="u-opt" value="${idx}" class="mr-2"> ${opt}
+                        </label>
+                    `;
+                });
+                document.getElementById('u-feedback').classList.add('hidden');
+                document.getElementById('u-next-btn').classList.add('hidden');
             } catch (e) {}
         }
 
-        // Unified Flow
-        async function u_setup() { gState.rank = parseInt(document.getElementById('u-rank').value); document.getElementById('u-step-wizard').classList.remove('opacity-50', 'pointer-events-none'); }
-        async function u_sendChat() {
-            const input = document.getElementById('u-input');
-            const data = await apiCall('/interview-chat', { message: input.value, history: wizardHistory, student_state: { current_estimated_level: 'unknown', current_rank_index: gState.rank } });
-            appendChat('u-chat', 'user', input.value);
-            if (data.is_final_turn) {
-                gState.elements = data.pedagogical_decision.story_elements;
-                u_startStory();
-            } else {
-                appendChat('u-chat', 'ai', data.chat_response);
-                wizardHistory.push({role:'user', content:input.value});
-                wizardHistory.push({role:'model', content:data.chat_response});
+        async function u_submitAssessment() {
+            const selected = document.querySelector('input[name="u-opt"]:checked');
+            if (!selected) return alert("Select an option!");
+
+            const btn = document.getElementById('u-submit-btn');
+            btn.disabled = true; btn.innerText = "Evaluating...";
+
+            try {
+                const submission = {
+                    student_state: globalStudentState,
+                    category: globalStoryArc.genre,
+                    level: globalStudentState.current_estimated_level,
+                    answers: { "q1": parseInt(selected.value) },
+                    correct_answers: { "q1": lastActData.assessment_tasks.comprehension_question.correct_option_index }
+                };
+                const feedback = await apiCall('/evaluate-assessment', submission);
+                document.getElementById('u-feedback').innerText = feedback.encouragement_message_hebrew + " " + feedback.explanation_hebrew;
+                document.getElementById('u-feedback').classList.remove('hidden');
+                document.getElementById('u-next-btn').classList.remove('hidden');
+                document.getElementById('u-submit-btn').classList.add('hidden');
+            } catch (e) {} finally {
+                btn.disabled = false; btn.innerText = "Submit Answer";
             }
-            input.value = '';
         }
-        async function u_startStory() {
-            // In the new flow, the arc is generated in Launchpad or Wizard.
-            // For unified flow, let's assume we use the first arc from Launchpad if available
-            if (!gState.lastLaunchData) {
-                alert("Please run Setup first!");
+
+        function u_nextAct() {
+            currentActNumber++;
+            if (currentActNumber > 5) {
+                alert("Story Completed! Great job.");
                 return;
             }
-            gState.arc = gState.lastLaunchData.potential_story_arcs[0];
-            document.getElementById('u-step-game').classList.remove('opacity-50', 'pointer-events-none');
-            u_playAct();
-        }
-        async function u_playAct() {
-            const arc = gState.arc;
-            const lData = gState.lastLaunchData;
-            const actIdx = gState.act - 1;
-
-            const hero = lData.heroes.find(h => h.id === arc.hero_id) || lData.heroes[0];
-            const setting = lData.settings.find(s => s.id === arc.setting_id) || lData.settings[0];
-
-            const body = {
-                story_arc_title: arc.title,
-                act_blueprint: arc.acts[actIdx],
-                // Pool of 20 words for unified flow
-                target_words: lData.selected_vocabulary.slice(actIdx * 10, (actIdx + 1) * 10 + 10),
-                student_state: { current_estimated_level: 'A1-Sub1' },
-                word_count_target: 150,
-                hero_description: hero.description,
-                setting_description: setting.description,
-                genre: document.getElementById('launchGenre').value,
-                previous_act_title: actIdx > 0 ? arc.acts[actIdx-1].title : null,
-                next_act_title: actIdx < 4 ? arc.acts[actIdx+1].title : null
-            };
-            const actData = await apiCall('/story/generate-act-content', body);
-            gState.lastActData = actData;
-            document.getElementById('u-game-area').innerText = actData.scene_text;
-            document.getElementById('u-assessment').classList.remove('hidden');
-            document.getElementById('u-question').innerText = actData.assessment_tasks.comprehension_question.question_text_hebrew;
-            const opts = document.getElementById('u-options'); opts.innerHTML = '';
-            actData.assessment_tasks.comprehension_question.options_hebrew.forEach((o, i) => {
-                opts.innerHTML += `<label class='block'><input type='radio' name='u-opt' value='${i}'> ${o}</label>`;
-            });
-        }
-        async function u_submit() {
-            const sel = document.querySelector('input[name="u-opt"]:checked');
-            const data = await apiCall('/evaluate-assessment', { student_state: {current_estimated_level:'A1-Sub1'}, category: 'Adventure', level: 'A1-Sub1', answers: {q1: parseInt(sel.value)}, correct_answers: {q1: gState.lastActData.assessment_tasks.comprehension_question.correct_option_index} });
-            document.getElementById('u-feedback').innerText = data.explanation_hebrew;
-            document.getElementById('u-next').classList.remove('hidden');
-        }
-        function u_next() {
-            gState.act++; if (gState.act > 5) return alert("Finished!");
-            document.getElementById('u-next').classList.add('hidden');
-            document.getElementById('u-feedback').innerText = '';
+            document.getElementById('u-assessment').classList.add('hidden');
+            document.getElementById('u-next-btn').classList.add('hidden');
+            document.getElementById('u-submit-btn').classList.remove('hidden');
             u_playAct();
         }
     </script>
