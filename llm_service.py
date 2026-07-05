@@ -11,7 +11,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-SCENE_MODEL_ID = os.getenv("SCENE_MODEL_ID", "gemini-3.1-flash-lite")
+SCENE_MODEL_ID = os.getenv("SCENE_MODEL_ID", "gemini-2.5-flash")
 EXAM_MODEL_ID = os.getenv("EXAM_MODEL_ID", "gemini-2.5-pro")
 
 CATALOG_PATH = "cefr_catalog.json"
