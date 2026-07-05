@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +9,15 @@ import llm_service
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Global Logging Configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 
 app = FastAPI(title="Adaptive English Learning API")
 
@@ -29,6 +39,16 @@ async def verify_token(x_app_token: str = Header(None)):
         raise HTTPException(status_code=401, detail="Invalid or missing X-App-Token")
     return x_app_token
 
+# --- Adventure Setup (Launchpad) ---
+
+@app.post("/adventure/setup", response_model=models.AdventureSetupResponse)
+async def adventure_setup(request: models.AdventureSetupRequest, token: str = Depends(verify_token)):
+    return llm_service.generate_adventure_setup(request)
+
+@app.post("/adventure/apply-guardrails", response_model=models.AdventureSetupResponse)
+async def apply_guardrails(request: models.GuardrailRequest, token: str = Depends(verify_token)):
+    return llm_service.apply_adventure_guardrails(request.data, request.target_rank)
+
 # --- Pedagogical Wizard ---
 
 @app.post("/interview-chat", response_model=models.InterviewChatResponse)
@@ -40,6 +60,11 @@ async def interview_chat(request: models.InterviewChatRequest, token: str = Depe
 @app.post("/story/generate-arc", response_model=models.StoryArc)
 async def generate_arc(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
     return llm_service.generate_story_arc(request)
+
+@app.post("/story/onboarding-decision", response_model=models.PedagogicalDecision)
+async def onboarding_decision(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
+    # This might be used by the wizard to finalize the arc and pedagogical state
+    return llm_service.onboarding_final_decision(request)
 
 @app.post("/story/generate-act-content", response_model=models.ActContentResponse)
 async def generate_act_content(request: models.ActContentRequest, token: str = Depends(verify_token)):
