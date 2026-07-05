@@ -35,6 +35,7 @@ def _load_catalog():
 
 def get_client():
     key = os.getenv("GEMINI_API_KEY")
+    logger.info(f"key loaded: {key}")
     if not key:
         logger.error("GEMINI_API_KEY not found in environment!")
     return genai.Client(api_key=key)
