@@ -11,7 +11,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-SCENE_MODEL_ID = os.getenv("SCENE_MODEL_ID", "gemini-2.5-flash")
+SCENE_MODEL_ID = os.getenv("SCENE_MODEL_ID", "gemini-3.1-flash-lite")
 EXAM_MODEL_ID = os.getenv("EXAM_MODEL_ID", "gemini-2.5-pro")
 
 CATALOG_PATH = "cefr_catalog.json"
@@ -35,7 +35,6 @@ def _load_catalog():
 
 def get_client():
     key = os.getenv("GEMINI_API_KEY")
-    logger.info(f"key loaded: {key}")
     if not key:
         logger.error("GEMINI_API_KEY not found in environment!")
     return genai.Client(api_key=key)
