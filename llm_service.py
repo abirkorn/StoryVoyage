@@ -108,25 +108,26 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
         {story_logic}
 
         CONSTRAINTS:
-        - HERO LABELS: For heroes, use the pattern "Name - Short Vocabulary Description" in the 'text' field.
-          - Example: "Didi - a small monkey".
-          - NAMES: Use unique names that incorporate or rhyme with the anchor letters '{anchor_letters}'.
+        - LABELS: In the 'text' field for Heroes, Settings, and Catalysts, prioritize natural, creative names. Use the VOCABULARY BANK for inspiration, but don't force words if they make the label nonsensical.
+        - HERO LABELS: Use the pattern "Name - Description".
         - DATA LINKING: Every Story Arc MUST explicitly link to a Hero, Setting, and Catalyst using the 'hero_id', 'setting_id', and 'catalyst_id' fields.
-        - COMBINATIONS: Generate 9 unique arcs covering different combinations of the 3x3x3 elements.
         - STRUCTURE: Each arc should have 3 Acts.
+        - ACT DETAILS: For every act in 'acts', you MUST provide:
+            - 'act_number': (1, 2, or 3)
+            - 'title': A short, catchy title.
+            - 'description': A detailed plot summary for this act.
+            - 'starting_point': Where the character begins this act.
+            - 'ending_point': Where the act ends, leading to a choice.
+            - 'branch_options': A list of 2-3 short, active choice strings.
 
         TASK:
         1. Generate EXACTLY 3 HEROES (IDs: h1, h2, h3).
         2. Generate EXACTLY 3 SETTINGS (IDs: s1, s2, s3).
         3. Generate EXACTLY 3 CATALYSTS (IDs: c1, c2, c3).
-        4. Generate EXACTLY 9 STORY ARCS. Each arc object MUST have:
-           - "hero_id": (e.g., "h1")
-           - "setting_id": (e.g., "s1")
-           - "catalyst_id": (e.g., "c1")
-           - "title": (String)
-           - "acts": (List of 3 Act objects)
+        4. Generate EXACTLY 9 STORY ARCS covering unique combinations.
+           Each arc object MUST have: 'hero_id', 'setting_id', 'catalyst_id', 'title', and 'acts' (with 3 full Act objects).
 
-        Output MUST be strict JSON.
+        Output MUST be strict JSON matching the AdventureSetupResponse schema.
         """
 
         logger.info(f"Calling LLM ({SCENE_MODEL_ID}) for adventure setup...")
@@ -171,8 +172,19 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
                     if "story_arcs" in raw_json and "potential_story_arcs" not in raw_json:
                         raw_json["potential_story_arcs"] = raw_json.pop("story_arcs")
 
-                    if "potential_story_arcs" in raw_json:
+                    # Normalize hero/setting/catalyst fields
+                    for key in ["heroes", "settings", "catalysts"]:
+                        if key in raw_json and isinstance(raw_json[key], list):
+                            for item in raw_json[key]:
+                                if not isinstance(item, dict): continue
+                                if "name" in item and "text" not in item:
+                                    item["text"] = item.pop("name")
+                                if "id" not in item:
+                                    item["id"] = f"{key[0]}{raw_json[key].index(item)+1}"
+
+                    if "potential_story_arcs" in raw_json and isinstance(raw_json["potential_story_arcs"], list):
                         for arc in raw_json["potential_story_arcs"]:
+                            if not isinstance(arc, dict): continue
                             if "acts" in arc and isinstance(arc["acts"], list):
                                 new_acts = []
                                 for i, act in enumerate(arc["acts"]):
@@ -181,16 +193,22 @@ def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.Ad
                                             "act_number": i + 1,
                                             "title": f"Act {i+1}",
                                             "description": act,
-                                            "starting_point": "...",
-                                            "ending_point": "..."
+                                            "starting_point": "Start",
+                                            "ending_point": "End",
+                                            "branch_options": []
                                         })
                                     elif isinstance(act, dict):
                                         if "act" in act and "act_number" not in act:
                                             act["act_number"] = act.pop("act")
+                                        if "act_number" not in act:
+                                            act["act_number"] = i + 1
                                         for field in ["title", "starting_point", "ending_point", "description"]:
                                             if field not in act: act[field] = "..."
+                                        if "branch_options" not in act: act["branch_options"] = []
                                         new_acts.append(act)
                                 arc["acts"] = new_acts
+                            else:
+                                arc["acts"] = []
 
                     data = models.AdventureSetupResponse(**raw_json)
                     logger.info("Manual parse fallback succeeded for adventure setup.")
@@ -367,7 +385,7 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
 
     LITERARY & VOCABULARY GUIDELINES (CEFR LEVEL: {request.student_state.current_estimated_level}):
     - NARRATIVE VOICE: Use a warm, vivid, and age-appropriate voice. Even with limited vocabulary, strive for "Show, Don't Tell." Focus on sensory details (sounds, colors, smells) and the protagonist's internal feelings (excitement, hesitation, curiosity).
-    - TARGET WORD COUNT: Aim for {request.word_count_target} words. Use descriptive adjectives and active verbs to flesh out the scene and meet this target without padding.
+    - LENGTH: Write at least 3 detailed paragraphs and at least 15-20 sentences. Strive for exactly {request.word_count_target} words or more. Do not use short, choppy sentences. Instead, use rich sensory details (what the hero sees, hears, feels), character internal monologue, and descriptive adjectives to flesh out the scene and meet this target naturally.
     - VOCABULARY POOL: {", ".join(request.target_words)}
     - SELECTION: Naturally weave in at least 10 words from the VOCABULARY POOL above.
 
@@ -380,8 +398,8 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     3. 'remedial_scene_text': Provide a natural, storytelling HEBREW translation of the scene text.
     4. 'vocabulary_definitions': Provide HEBREW definitions accurately reflecting how the words were used in the context of the scene.
     5. 'assessment_tasks':
-       - 'comprehension_question': A question in HEBREW about the scene.
-       - 'cloze_task': An English sentence from the scene with one word missing (the blank).
+       - 'comprehension_question': A question in HEBREW about the scene. Provide 3 likely options in HEBREW and the correct index.
+       - 'cloze_task': An English sentence from the scene with one word missing (the blank). Provide 3 options in ENGLISH and the correct index.
     6. 'story_branches': Match the CHOICE OPTIONS exactly. Provide both HEBREW and ENGLISH text for each.
 
     Output MUST be strictly valid JSON matching the ActContentResponse schema. Do not include markdown formatting or prose outside the JSON.
@@ -425,22 +443,56 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
                         ]
 
                     # Normalize assessment_tasks
-                    if "assessment_tasks" in raw_json:
+                    if "assessment_tasks" in raw_json and isinstance(raw_json["assessment_tasks"], dict):
                         at = raw_json["assessment_tasks"]
-                        if "comprehension_question" in at and isinstance(at["comprehension_question"], str):
-                            at["comprehension_question"] = {
-                                "question_text_hebrew": at["comprehension_question"],
-                                "options_hebrew": ["...", "...", "..."],
-                                "correct_option_index": 0,
-                                "explanation_hebrew": "..."
-                            }
-                        if "cloze_task" in at and isinstance(at["cloze_task"], str):
-                            at["cloze_task"] = {
-                                "sentence_with_blank": at["cloze_task"],
-                                "options": ["...", "...", "..."],
-                                "correct_option_index": 0,
-                                "translation_of_blank_word_hebrew": "..."
-                            }
+                        if "comprehension_question" in at:
+                            cq = at["comprehension_question"]
+                            if isinstance(cq, str):
+                                at["comprehension_question"] = {
+                                    "question_text_hebrew": cq,
+                                    "options_hebrew": ["...", "...", "..."],
+                                    "correct_option_index": 0,
+                                    "explanation_hebrew": "..."
+                                }
+                            elif isinstance(cq, dict):
+                                if "question" in cq and "question_text_hebrew" not in cq:
+                                    cq["question_text_hebrew"] = cq.pop("question")
+                                if "question_text" in cq and "question_text_hebrew" not in cq:
+                                    cq["question_text_hebrew"] = cq.pop("question_text")
+                                if "options" in cq and "options_hebrew" not in cq:
+                                    cq["options_hebrew"] = cq.pop("options")
+                                if "correct_index" in cq and "correct_option_index" not in cq:
+                                    cq["correct_option_index"] = cq.pop("correct_index")
+
+                        if "cloze_task" in at:
+                            ct = at["cloze_task"]
+                            if isinstance(ct, str):
+                                at["cloze_task"] = {
+                                    "sentence_with_blank": ct,
+                                    "options": ["...", "...", "..."],
+                                    "correct_option_index": 0,
+                                    "translation_of_blank_word_hebrew": "..."
+                                }
+                            elif isinstance(ct, dict):
+                                if "sentence" in ct and "sentence_with_blank" not in ct:
+                                    ct["sentence_with_blank"] = ct.pop("sentence")
+                                if "sentence_text" in ct and "sentence_with_blank" not in ct:
+                                    ct["sentence_with_blank"] = ct.pop("sentence_text")
+                                if "correct_index" in ct and "correct_option_index" not in ct:
+                                    ct["correct_option_index"] = ct.pop("correct_index")
+
+                    # Normalize story_branches
+                    if "branches" in raw_json and "story_branches" not in raw_json:
+                        raw_json["story_branches"] = raw_json.pop("branches")
+                    if "story_branches" in raw_json and isinstance(raw_json["story_branches"], list):
+                        for i, branch in enumerate(raw_json["story_branches"]):
+                            if not isinstance(branch, dict): continue
+                            if "english" in branch and "text_english" not in branch:
+                                branch["text_english"] = branch.pop("english")
+                            if "hebrew" in branch and "text_hebrew" not in branch:
+                                branch["text_hebrew"] = branch.pop("hebrew")
+                            if "choice_id" not in branch:
+                                branch["choice_id"] = i + 1
 
                     data = models.ActContentResponse(**raw_json)
                     logger.info("Manual parse fallback succeeded for act content.")
