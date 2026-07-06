@@ -377,30 +377,36 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     - SETTING: {request.setting_description}
     - FLOW: {request.previous_act_title or 'Start'} -> **{bp.title}** -> {request.next_act_title or 'End'}
 
-    ACT DETAILS:
-    - DESCRIPTION: {bp.description}
-    - STARTING POINT: {bp.starting_point}
-    - ENDING POINT: {bp.ending_point}
-    - CHOICE OPTIONS TO BUILD TOWARDS: {", ".join(bp.branch_options)}
+    ACT CONSTRAINTS (UNBREAKABLE LAWS):
+    - STARTING POINT: {bp.starting_point} (The scene MUST open exactly here).
+    - ENDING POINT: {bp.ending_point} (The prose MUST transition logically and end exactly here).
+    - DESCRIPTION: {bp.description} (This is the core narrative you must expand upon).
+    - TARGET BRANCH OPTIONS: 1. "{bp.branch_options[0]}" | 2. "{bp.branch_options[1]}" (The scene MUST logically set up these specific choices).
 
-    LITERARY & VOCABULARY GUIDELINES (CEFR LEVEL: {request.student_state.current_estimated_level}):
-    - NARRATIVE VOICE: Use a warm, vivid, and age-appropriate voice. Even with limited vocabulary, strive for "Show, Don't Tell." Focus on sensory details (sounds, colors, smells) and the protagonist's internal feelings (excitement, hesitation, curiosity).
-    - LENGTH: Write at least 3 detailed paragraphs and at least 15-20 sentences. Strive for exactly {request.word_count_target} words or more. Do not use short, choppy sentences. Instead, use rich sensory details (what the hero sees, hears, feels), character internal monologue, and descriptive adjectives to flesh out the scene and meet this target naturally.
-    - VOCABULARY POOL: {", ".join(request.target_words)}
-    - SELECTION: Naturally weave in at least 10 words from the VOCABULARY POOL above.
+    LITERARY & STRUCTURAL BUDGET (CEFR LEVEL: {request.student_state.current_estimated_level}):
+    - NARRATIVE VOICE: Use a warm, vivid, and age-appropriate voice. Strive for "Show, Don't Tell." Focus on sensory details (sounds, colors, smells) and the protagonist's internal feelings.
+    - STRUCTURAL BUDGET: Instead of counting words, you MUST write exactly 3 to 4 detailed paragraphs. Each paragraph MUST contain 4 to 6 rich, descriptive sentences. This structure is required to naturally meet the length target (~{request.word_count_target} words) without using short, choppy sentences.
+
+    VOCABULARY POOL & INJECTION RULES:
+    - POOL: {", ".join(request.target_words)}
+    - RULE 1: Naturally weave in at least 10 words from the POOL. You may adapt the words (e.g., "glowing" instead of "glow") to maintain grammatical excellence.
+    - RULE 2: DO NOT ALTER THE PLOT TO FIT THE WORDS. The narrative must remain absolutely true to the DESCRIPTION and TARGET BRANCH OPTIONS. 
+    - RULE 3: Use the target words ONLY as descriptive elements (colors, textures, emotions, background objects) or minor actions. For example, if a word is "guitar", describe a background sound or a shape, do NOT make finding a guitar the focus of the scene if it contradicts the branches.
+
+    STRICT WRITING STEP-BY-STEP PROCESS (Think before you write):
+    Step 1 (Plot): Establish the narrative bridge moving the hero from the STARTING POINT to the ENDING POINT based strictly on the DESCRIPTION.
+    Step 2 (The Crossroads): Ensure the final sentences of the prose create the exact tension or cliffhanger that naturally and logically introduces the TARGET BRANCH OPTIONS.
+    Step 3 (Decoration): Review the planned narrative and seamlessly inject the required vocabulary organically as sensory details, following the Injection Rules.
 
     REQUIREMENTS:
-    1. 'scene_text': Write engaging, descriptive prose in VIVID, SIMPLE ENGLISH.
-       - Seamlessly bridge the STARTING POINT to the ENDING POINT while expanding on the provided DESCRIPTION.
-       - Integration: The words from the pool MUST feel like a natural part of the author's voice. You may adapt the words (e.g., "glowing" instead of "glow") to maintain grammatical excellence.
-       - Pacing: Build mystery, wonder, or excitement. The scene must end exactly at the moment of decision, making the BRANCH OPTIONS feel like urgent, meaningful crossroads.
+    1. 'scene_text': The final beautiful English prose resulting from the steps above.
     2. 'used_vocabulary': List the words from the pool that you actually incorporated.
     3. 'remedial_scene_text': Provide a natural, storytelling HEBREW translation of the scene text.
     4. 'vocabulary_definitions': Provide HEBREW definitions accurately reflecting how the words were used in the context of the scene.
     5. 'assessment_tasks':
        - 'comprehension_question': A question in HEBREW about the scene. Provide 3 likely options in HEBREW and the correct index.
        - 'cloze_task': An English sentence from the scene with one word missing (the blank). Provide 3 options in ENGLISH and the correct index.
-    6. 'story_branches': Match the CHOICE OPTIONS exactly. Provide both HEBREW and ENGLISH text for each.
+    6. 'story_branches': Match the TARGET BRANCH OPTIONS exactly. Provide both HEBREW and ENGLISH text for each.
 
     Output MUST be strictly valid JSON matching the ActContentResponse schema. Do not include markdown formatting or prose outside the JSON.
     """
