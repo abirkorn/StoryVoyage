@@ -58,15 +58,15 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Rank Index</label>
+                                <label for="launchRank" class="block font-medium text-xs text-gray-500 uppercase">Rank Index</label>
                                 <input type="number" id="launchRank" value="100" class="w-full border p-2 rounded">
                             </div>
                             <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Word Count</label>
+                                <label for="launchCount" class="block font-medium text-xs text-gray-500 uppercase">Word Count</label>
                                 <input type="number" id="launchCount" value="100" class="w-full border p-2 rounded">
                             </div>
                             <div>
-                                <label class="block font-medium text-xs text-gray-500 uppercase">Fraction Above (0.1 = 10%)</label>
+                                <label for="launchPct" class="block font-medium text-xs text-gray-500 uppercase">Fraction Above (0.1 = 10%)</label>
                                 <input type="number" step="0.01" id="launchPct" value="0.10" class="w-full border p-2 rounded">
                             </div>
                         </div>
@@ -120,30 +120,40 @@
                                 <label class="block text-xs font-bold uppercase text-gray-400">Story Title</label>
                                 <input type="text" id="actStoryTitle" class="w-full border p-2 rounded text-xs">
                             </div>
-                            <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Word Count Target</label>
-                                <input type="number" id="actWordCount" value="100" class="w-full border p-2 rounded text-xs">
+                            <div class="col-span-1 flex gap-2">
+                                <div class="w-1/2">
+                                    <label for="actNumParas" class="block text-xs font-bold uppercase text-gray-400"># Paras</label>
+                                    <input type="number" id="actNumParas" value="3" class="w-full border p-2 rounded text-xs">
+                                </div>
+                                <div class="w-1/2">
+                                    <label for="actSentPerPara" class="block text-xs font-bold uppercase text-gray-400">Sent / Para</label>
+                                    <input type="number" id="actSentPerPara" value="4" class="w-full border p-2 rounded text-xs">
+                                </div>
                             </div>
                             <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Genre</label>
+                                <label for="actGenre" class="block text-xs font-bold uppercase text-gray-400">Genre</label>
                                 <input type="text" id="actGenre" class="w-full border p-2 rounded text-xs">
                             </div>
                             <div class="col-span-1">
-                                <label class="block text-xs font-bold uppercase text-gray-400">Hero Desc</label>
+                                <label for="actHeroDesc" class="block text-xs font-bold uppercase text-gray-400">Hero Desc</label>
                                 <input type="text" id="actHeroDesc" class="w-full border p-2 rounded text-xs">
                             </div>
                         </div>
-                        <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="grid grid-cols-4 gap-4 mb-4">
                             <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Prev Act</label>
+                                <label for="actPrev" class="block text-xs font-bold uppercase text-gray-400">Prev Act</label>
                                 <input type="text" id="actPrev" class="w-full border p-2 rounded text-xs">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Setting Desc</label>
+                                <label for="actSettingDesc" class="block text-xs font-bold uppercase text-gray-400">Setting Desc</label>
                                 <input type="text" id="actSettingDesc" class="w-full border p-2 rounded text-xs">
                             </div>
                             <div>
-                                <label class="block text-xs font-bold uppercase text-gray-400">Next Act</label>
+                                <label for="actCatalystDesc" class="block text-xs font-bold uppercase text-gray-400">Catalyst Desc</label>
+                                <input type="text" id="actCatalystDesc" class="w-full border p-2 rounded text-xs">
+                            </div>
+                            <div>
+                                <label for="actNext" class="block text-xs font-bold uppercase text-gray-400">Next Act</label>
                                 <input type="text" id="actNext" class="w-full border p-2 rounded text-xs">
                             </div>
                         </div>
@@ -305,11 +315,13 @@
             // Map the arc to specific hero/setting/catalyst using IDs
             const hero = data.heroes.find(h => h.id === arc.hero_id) || data.heroes[0];
             const setting = data.settings.find(s => s.id === arc.setting_id) || data.settings[0];
+            const catalyst = data.catalysts.find(c => c.id === arc.catalyst_id) || data.catalysts[0];
 
             document.getElementById('actStoryTitle').value = arc.title;
             document.getElementById('actGenre').value = document.getElementById('launchGenre').value;
             document.getElementById('actHeroDesc').value = hero.description;
             document.getElementById('actSettingDesc').value = setting.description;
+            document.getElementById('actCatalystDesc').value = catalyst.description;
             document.getElementById('actPrev').value = "";
             document.getElementById('actNext').value = arc.acts[1].title;
 
@@ -326,12 +338,14 @@
                 starting_point: "Leo is bored in his room.",
                 ending_point: "Leo finds a glowing map under his bed.",
                 description: "The hero discovers the inciting incident.",
+                plot_beats: ["Leo kicks his bed", "He hears a crinkle", "He reaches under and finds the map", "The map glows golden"],
                 branch_options: ["Check the map", "Hide it"]
             };
             document.getElementById('actStoryTitle').value = "Sample Adventure";
             document.getElementById('actGenre').value = "Mystery";
             document.getElementById('actHeroDesc').value = "Leo - a curious boy";
             document.getElementById('actSettingDesc').value = "A dusty attic";
+            document.getElementById('actCatalystDesc').value = "A glowing golden map";
             document.getElementById('actPrev').value = "";
             document.getElementById('actNext').value = "The Forbidden Gate";
             document.getElementById('actBlueprintInput').value = JSON.stringify(toy, null, 2);
@@ -388,9 +402,11 @@
                     act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
                     target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()).filter(w => w),
                     student_state: { current_estimated_level: 'A1-Sub1' },
-                    word_count_target: parseInt(document.getElementById('actWordCount').value),
+                    num_paragraphs: parseInt(document.getElementById('actNumParas').value),
+                    sentences_per_paragraph: parseInt(document.getElementById('actSentPerPara').value),
                     hero_description: document.getElementById('actHeroDesc').value,
                     setting_description: document.getElementById('actSettingDesc').value,
+                    catalyst_description: document.getElementById('actCatalystDesc').value,
                     genre: document.getElementById('actGenre').value,
                     previous_act_title: document.getElementById('actPrev').value,
                     next_act_title: document.getElementById('actNext').value
@@ -444,6 +460,7 @@
 
             const hero = lData.heroes.find(h => h.id === arc.hero_id) || lData.heroes[0];
             const setting = lData.settings.find(s => s.id === arc.setting_id) || lData.settings[0];
+            const catalyst = lData.catalysts.find(c => c.id === arc.catalyst_id) || lData.catalysts[0];
 
             const body = {
                 story_arc_title: arc.title,
@@ -451,9 +468,11 @@
                 // Pool of 20 words for unified flow
                 target_words: lData.selected_vocabulary.slice(actIdx * 10, (actIdx + 1) * 10 + 10),
                 student_state: { current_estimated_level: 'A1-Sub1' },
-                word_count_target: 150,
+                num_paragraphs: 3,
+                sentences_per_paragraph: 4,
                 hero_description: hero.description,
                 setting_description: setting.description,
+                catalyst_description: catalyst.description,
                 genre: document.getElementById('launchGenre').value,
                 previous_act_title: actIdx > 0 ? arc.acts[actIdx-1].title : null,
                 next_act_title: actIdx < 4 ? arc.acts[actIdx+1].title : null
