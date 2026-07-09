@@ -122,12 +122,12 @@
                             </div>
                             <div class="col-span-1 flex gap-2">
                                 <div class="w-1/2">
-                                    <label for="actNumParas" class="block text-xs font-bold uppercase text-gray-400"># Paras</label>
-                                    <input type="number" id="actNumParas" value="3" class="w-full border p-2 rounded text-xs">
+                                    <label for="actNumParas" class="block text-xs font-bold uppercase text-gray-400"># Paras (Optional)</label>
+                                    <input type="number" id="actNumParas" value="" class="w-full border p-2 rounded text-xs" placeholder="Default">
                                 </div>
                                 <div class="w-1/2">
-                                    <label for="actSentPerPara" class="block text-xs font-bold uppercase text-gray-400">Sent / Para</label>
-                                    <input type="number" id="actSentPerPara" value="4" class="w-full border p-2 rounded text-xs">
+                                    <label for="actSentPerPara" class="block text-xs font-bold uppercase text-gray-400">Sent / Para (Optional)</label>
+                                    <input type="number" id="actSentPerPara" value="" class="w-full border p-2 rounded text-xs" placeholder="Default">
                                 </div>
                             </div>
                             <div class="col-span-1">
@@ -397,13 +397,15 @@
         async function generateActProse() {
             const btn = document.getElementById('genActBtn'); btn.disabled = true;
             try {
+                const numParas = document.getElementById('actNumParas').value;
+                const sentPerPara = document.getElementById('actSentPerPara').value;
                 const body = {
                     story_arc_title: document.getElementById('actStoryTitle').value,
                     act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
                     target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()).filter(w => w),
                     student_state: { current_estimated_level: 'A1-Sub1' },
-                    num_paragraphs: parseInt(document.getElementById('actNumParas').value),
-                    sentences_per_paragraph: parseInt(document.getElementById('actSentPerPara').value),
+                    num_paragraphs: numParas ? parseInt(numParas) : null,
+                    sentences_per_paragraph: sentPerPara ? parseInt(sentPerPara) : null,
                     hero_description: document.getElementById('actHeroDesc').value,
                     setting_description: document.getElementById('actSettingDesc').value,
                     catalyst_description: document.getElementById('actCatalystDesc').value,

@@ -39,6 +39,21 @@ def get_client():
         logger.error("GEMINI_API_KEY not found in environment!")
     return genai.Client(api_key=key)
 
+def get_target_structure(level: str) -> Dict[str, int]:
+    """
+    Determines the target narrative structure based on CEFR level.
+    """
+    lvl = level.upper()
+    if any(p in lvl for p in ["PRE-A1", "A1"]):
+        return {"num_paragraphs": 2, "sentences_per_paragraph": 3}
+    if "A2" in lvl:
+        return {"num_paragraphs": 3, "sentences_per_paragraph": 4}
+    if any(p in lvl for p in ["B1", "B2", "C1", "C2"]):
+        return {"num_paragraphs": 4, "sentences_per_paragraph": 5}
+
+    # Default fallback
+    return {"num_paragraphs": 3, "sentences_per_paragraph": 4}
+
 def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> Dict[str, Any]:
     """
     Selects x words from cefr_catalog.json around rank_index.
@@ -368,46 +383,38 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     client = get_client()
     bp = request.act_blueprint
 
-    prompt = f"""
-    You are an expert, award-winning Children's Book Author specializing in interactive fiction ("Choose Your Own Adventure"). Write Act {bp.act_number} of a captivating, deeply engaging story for young readers.
+    # Dynamic structure logic
+    struct = get_target_structure(request.student_state.current_estimated_level)
+    num_paragraphs = request.num_paragraphs or struct["num_paragraphs"]
+    sentences_per_paragraph = request.sentences_per_paragraph or struct["sentences_per_paragraph"]
 
-    The primary goal is **exceptional literary quality and emotional resonance**. The story must feel like a cherished piece of children's literature, NEVER like a dry language exercise or a collection of forced sentences.
+    prompt = f"""
+    You are an expert Children's Book Author. Write Act {bp.act_number} of an interactive story.
 
     STORY CONTEXT:
     - TITLE: {request.story_arc_title}
-    - GENRE: {request.genre}
-    - HERO: {request.hero_description}
-    - SETTING: {request.setting_description}
-    - CATALYST: {request.catalyst_description}
-    - FLOW: {request.previous_act_title or 'Start'} -> **{bp.title}** -> {request.next_act_title or 'End'}
-
-    ACT DETAILS:
-    - DESCRIPTION: {bp.description}
+    - HERO/SETTING/CATALYST: {request.hero_description}, {request.setting_description}, {request.catalyst_description}
     - PLOT BEATS: {", ".join(bp.plot_beats)}
-    - STARTING POINT: {bp.starting_point}
-    - ENDING POINT: {bp.ending_point}
-    - CHOICE OPTIONS TO BUILD TOWARDS: {", ".join(bp.branch_options)}
+    - BRIDGE: Start at '{bp.starting_point}' and end exactly at '{bp.ending_point}'.
 
-    LITERARY & VOCABULARY GUIDELINES (CEFR LEVEL: {request.student_state.current_estimated_level}):
-    - NARRATIVE VOICE: Use a warm, vivid, and age-appropriate voice. Even with limited vocabulary, strive for "Show, Don't Tell." Focus on sensory details (sounds, colors, smells) and the protagonist's internal feelings (excitement, hesitation, curiosity).
-    - STRUCTURE: Write EXACTLY {request.num_paragraphs} detailed paragraphs. Each paragraph MUST contain EXACTLY {request.sentences_per_paragraph} sentences. This is a strict constraint.
-    - VOCABULARY POOL: {", ".join(request.target_words)}
-    - SELECTION: Naturally weave in at least 10 words from the VOCABULARY POOL above.
+    LITERARY CONSTRAINTS (LEVEL: {request.student_state.current_estimated_level}):
+    - VOICE: Warm and vivid. Use sensory details and internal feelings.
+    - STRUCTURE: You MUST output 'scene_paragraphs' as an array of arrays: [[sentence1, sentence2...], [sentence1...]].
+    - CONSTRAINT: EXACTLY {num_paragraphs} paragraphs, each with EXACTLY {sentences_per_paragraph} sentences.
+    - VOCABULARY: Weave in at least 10 words from: {", ".join(request.target_words)}.
+    - ENDING: The very last sentence of the final paragraph must perfectly set up these choices: {", ".join(bp.branch_options)}.
 
-    REQUIREMENTS:
-    1. 'scene_text': Write engaging, descriptive prose in VIVID, SIMPLE ENGLISH.
-       - Seamlessly bridge the STARTING POINT to the ENDING POINT while expanding on the provided DESCRIPTION.
-       - Integration: The words from the pool MUST feel like a natural part of the author's voice. You may adapt the words (e.g., "glowing" instead of "glow") to maintain grammatical excellence.
-       - Pacing: Build mystery, wonder, or excitement. The scene must end exactly at the moment of decision, making the BRANCH OPTIONS feel like urgent, meaningful crossroads.
-    2. 'used_vocabulary': List the words from the pool that you actually incorporated.
-    3. 'remedial_scene_text': Provide a natural, storytelling HEBREW translation of the scene text.
-    4. 'vocabulary_definitions': Provide HEBREW definitions accurately reflecting how the words were used in the context of the scene.
+    JSON OUTPUT REQUIREMENTS:
+    1. 'scene_paragraphs': List of lists of sentences as defined above.
+    2. 'used_vocabulary': List of words used from the pool.
+    3. 'remedial_scene_text': Storytelling Hebrew translation.
+    4. 'vocabulary_definitions': Hebrew definitions for used words (List of {{"word": "...", "definition_hebrew": "..."}}).
     5. 'assessment_tasks':
-       - 'comprehension_question': A question in HEBREW about the scene. Provide 3 likely options in HEBREW and the correct index.
-       - 'cloze_task': An English sentence from the scene with one word missing (the blank). Provide 3 options in ENGLISH and the correct index.
-    6. 'story_branches': Match the CHOICE OPTIONS exactly. Provide both HEBREW and ENGLISH text for each.
+       - 'comprehension_question': Hebrew question + 3 options + correct_option_index.
+       - 'cloze_task': English sentence from your text with one word replaced by a blank + 3 options + correct_option_index.
+    6. 'story_branches': List of {{"choice_id": 1, "text_english": "...", "text_hebrew": "..."}} matching the options provided.
 
-    Output MUST be strictly valid JSON matching the ActContentResponse schema. Do not include markdown formatting or prose outside the JSON.
+    Strict valid JSON matching ActContentResponse. No markdown.
     """
     try:
         response = client.models.generate_content(
