@@ -44,6 +44,7 @@ class ActBlueprint(BaseModel):
     starting_point: str = ""
     ending_point: str = ""
     description: str = ""
+    plot_beats: List[str] = Field(default_factory=list)
     branch_options: List[str] = Field(default_factory=list)
 
 class StoryArc(BaseModel):
@@ -105,9 +106,11 @@ class ActContentRequest(BaseModel):
     act_blueprint: ActBlueprint
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
-    word_count_target: int = 150
+    num_paragraphs: int = 3
+    sentences_per_paragraph: int = 4
     hero_description: Optional[str] = None
     setting_description: Optional[str] = None
+    catalyst_description: Optional[str] = None
     genre: Optional[str] = None
     previous_act_title: Optional[str] = None
     next_act_title: Optional[str] = None
