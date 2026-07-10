@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Dict, Any, Optional, Union
 
 # --- Common Models ---
@@ -106,8 +106,8 @@ class ActContentRequest(BaseModel):
     act_blueprint: ActBlueprint
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
-    num_paragraphs: int = 3
-    sentences_per_paragraph: int = 4
+    num_paragraphs: Optional[int] = 3
+    sentences_per_paragraph: Optional[int] = 4
     hero_description: Optional[str] = None
     setting_description: Optional[str] = None
     catalyst_description: Optional[str] = None
@@ -146,12 +146,21 @@ class VocabularyDefinition(BaseModel):
 
 class ActContentResponse(BaseModel):
     act_number: int = 0
+    scene_paragraphs: List[List[str]] = Field(default_factory=list)
     scene_text: str = ""
     remedial_scene_text: str = ""
     vocabulary_definitions: List[VocabularyDefinition] = Field(default_factory=list)
     used_vocabulary: List[str] = Field(default_factory=list)
     assessment_tasks: Optional[AssessmentTasks] = None
     story_branches: List[StoryBranch] = Field(default_factory=list)
+
+    @model_validator(mode='after')
+    def flatten_scene_text(self) -> 'ActContentResponse':
+        if self.scene_paragraphs:
+            # Join sentences with spaces, and paragraphs with \n\n
+            p_strings = [" ".join(sentences) for sentences in self.scene_paragraphs]
+            self.scene_text = "\n\n".join(p_strings)
+        return self
 
 # --- Assessment Evaluation Models ---
 

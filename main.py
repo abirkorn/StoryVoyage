@@ -1,6 +1,8 @@
 import os
 import logging
-from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi import FastAPI, Header, HTTPException, Depends, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -20,6 +22,14 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="Adaptive English Learning API")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logging.error(f"Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
 
 # CORS configuration
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
@@ -68,7 +78,11 @@ async def onboarding_decision(request: models.GenerateArcRequest, token: str = D
 
 @app.post("/story/generate-act-content", response_model=models.ActContentResponse)
 async def generate_act_content(request: models.ActContentRequest, token: str = Depends(verify_token)):
-    return llm_service.generate_act_content(request)
+    try:
+        return llm_service.generate_act_content(request)
+    except Exception as e:
+        logging.exception("Error in generate_act_content")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Assessment & Evaluation ---
 
