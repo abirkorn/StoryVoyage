@@ -1,4 +1,4 @@
-# StoryVoyage Backend Architecture
+# StoryVoyage Backend Architecture  - by Abir Koren
 
 *Note: Please read `PRODUCT_CONTEXT.md` first to understand the pedagogical goals and CEFR rules of this project.*
 
