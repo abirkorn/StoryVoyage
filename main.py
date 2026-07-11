@@ -53,11 +53,7 @@ async def verify_token(x_app_token: str = Header(None)):
 
 @app.post("/adventure/setup", response_model=models.AdventureSetupResponse)
 async def adventure_setup(request: models.AdventureSetupRequest, token: str = Depends(verify_token)):
-    return llm_service.generate_story_options(request)
-
-@app.post("/adventure/generate-dag", response_model=models.StoryDAG)
-async def generate_dag(request: models.GenerateDAGRequest, token: str = Depends(verify_token)):
-    return llm_service.generate_story_dag(request)
+    return llm_service.generate_adventure_setup(request)
 
 @app.post("/adventure/apply-guardrails", response_model=models.AdventureSetupResponse)
 async def apply_guardrails(request: models.GuardrailRequest, token: str = Depends(verify_token)):
@@ -70,6 +66,10 @@ async def interview_chat(request: models.InterviewChatRequest, token: str = Depe
     return llm_service.generate_interview_response(request)
 
 # --- Hierarchical Story Pipeline ---
+
+@app.post("/story/generate-arc", response_model=models.StoryArc)
+async def generate_arc(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
+    return llm_service.generate_story_arc(request)
 
 @app.post("/story/onboarding-decision", response_model=models.PedagogicalDecision)
 async def onboarding_decision(request: models.GenerateArcRequest, token: str = Depends(verify_token)):
