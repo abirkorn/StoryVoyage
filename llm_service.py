@@ -6,6 +6,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 import models
+from vocabulary_engine import VocabularyEngine
 
 load_dotenv()
 
@@ -89,164 +90,155 @@ def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> 
         logger.error(f"Error in get_catalog_words: {e}")
         return {"words": ["water", "tree", "friend", "happy", "big"], "min_rank": 0, "max_rank": 0}
 
-def generate_adventure_setup(request: models.AdventureSetupRequest) -> models.AdventureSetupResponse:
-    logger.info(f"Generating Adventure Setup. Genre: {request.genre}, Rank: {request.rank_index}, Words: {request.num_words}")
+def generate_story_options(request: models.AdventureSetupRequest) -> models.AdventureSetupResponse:
+    logger.info(f"Generating Story Options. Genre: {request.genre}, Rank: {request.rank_index}")
 
-    # Validation to prevent logic errors with pct_above
-    if request.pct_above > 1.0:
-        logger.warning(f"pct_above {request.pct_above} is > 1.0, likely a UI error. Normalizing to {request.pct_above/100}")
-        request.pct_above /= 100.0
+    engine = VocabularyEngine()
+    words = engine.fetch_vocabulary(
+        target_rank=request.rank_index,
+        semantic_query=request.semantic_query or request.genre,
+        pos_distribution={"n.": 0.5, "adj.": 0.3, "v.": 0.2},
+        state_distribution={models.WordState.UNSEEN: 0.9, models.WordState.LEARNING: 0.1},
+        word_count=40
+    )
 
     client = get_client()
-    vocab_data = get_catalog_words(request.rank_index, request.num_words, request.pct_above)
-    words = vocab_data["words"]
+    prompt = f"""
+    You are an expert Story Architect. Generate EXACTLY 3 distinct story premises for a child.
+
+    THEME/GENRE: {request.genre}
+    INSPIRATION VOCABULARY: {", ".join(words)}
+
+    TASK:
+    Generate a list of 3 StoryPremise objects.
+    Each Premise MUST include:
+    - 'id': 'p1', 'p2', or 'p3'
+    - 'title': A catchy name for the story.
+    - 'hero': A brief description (e.g., "Coco - a brave cat who fears water").
+    - 'setting': A vivid location (e.g., "The Whispering Woods where trees move").
+    - 'catalyst': The event that starts the adventure (e.g., "Finding a map that changes its route").
+
+    Output MUST be strict JSON matching models.AdventureSetupResponse schema (specifically the 'premises' field).
+    """
 
     try:
-        if not os.path.exists(STORY_LOGIC_PATH):
-            logger.error(f"Story logic file missing: {STORY_LOGIC_PATH}")
-            story_logic = "Use CYOA branching logic."
-        else:
-            with open(STORY_LOGIC_PATH, "r") as f:
-                story_logic = f.read()
+        response = client.models.generate_content(
+            model=SCENE_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
 
-        # Derive name anchor letters from first few words
-        anchor_letters = "".join([w[0].upper() for w in words[:4]])
-
-        prompt = f"""
-        You are an expert ESL Story Architect. Build a modular adventure setup for a child.
-
-        GENRE: {request.genre}
-        VOCABULARY BANK: {", ".join(words)}
-        NAME ANCHOR LETTERS: {anchor_letters}
-
-        STORY LOGIC CONTEXT:
-        {story_logic}
-
-        CONSTRAINTS:
-        - LABELS: In the 'text' field for Heroes, Settings, and Catalysts, prioritize natural, creative names. Use the VOCABULARY BANK for inspiration, but don't force words if they make the label nonsensical.
-        - HERO LABELS: Use the pattern "Name - Description".
-        - DATA LINKING: Every Story Arc MUST explicitly link to a Hero, Setting, and Catalyst using the 'hero_id', 'setting_id', and 'catalyst_id' fields.
-        - STRUCTURE: Each arc should have 3 Acts.
-        - ACT DETAILS: For every act in 'acts', you MUST provide:
-            - 'act_number': (1, 2, or 3)
-            - 'title': A short, catchy title.
-            - 'description': A high-level overview of the act.
-            - 'plot_beats': A list of 4-5 specific chronological events (beats) that happen during this act. This is the skeleton for the actual prose.
-            - 'starting_point': Where the character begins this act.
-            - 'ending_point': Where the act ends, leading to a choice.
-            - 'branch_options': A list of 2-3 short, active choice strings.
-
-        TASK:
-        1. Generate EXACTLY 3 HEROES (IDs: h1, h2, h3).
-        2. Generate EXACTLY 3 SETTINGS (IDs: s1, s2, s3).
-        3. Generate EXACTLY 3 CATALYSTS (IDs: c1, c2, c3).
-        4. Generate EXACTLY 9 STORY ARCS covering unique combinations.
-           Each arc object MUST have: 'hero_id', 'setting_id', 'catalyst_id', 'title', and 'acts' (with 3 full Act objects).
-
-        Output MUST be strict JSON matching the AdventureSetupResponse schema.
-        """
-
-        logger.info(f"Calling LLM ({SCENE_MODEL_ID}) for adventure setup...")
+        raw_text = response.text
+        # Apply normalization fallback if needed
         try:
-            response = client.models.generate_content(
-                model=SCENE_MODEL_ID,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                )
-            )
-        except Exception as api_err:
-            logger.error(f"Gemini API Call Failed for /adventure/setup: {api_err}")
-            raise api_err
-
-        if not response or not response.parsed:
-            raw_text = getattr(response, 'text', 'None')
-            logger.error(f"LLM returned empty or unparseable response for /adventure/setup. Raw text: {raw_text}")
-
-            # Fallback for Pydantic parsing issues if raw text exists
-            if raw_text and raw_text != 'None':
-                try:
-                    # Strip markdown if present
-                    clean_json = raw_text
-                    if "```json" in raw_text:
-                        clean_json = raw_text.split("```json")[1].split("```")[0].strip()
-                    elif "```" in raw_text:
-                        clean_json = raw_text.split("```")[1].split("```")[0].strip()
-
-                    # Handle extra data at the end (like an extra })
-                    try:
-                        raw_json = json.loads(clean_json)
-                    except json.JSONDecodeError:
-                        # Try to find the last valid }
-                        last_brace = clean_json.rfind("}")
-                        if last_brace != -1:
-                            raw_json = json.loads(clean_json[:last_brace+1])
-                        else:
-                            raise
-
-                    # Normalize keys
-                    if "story_arcs" in raw_json and "potential_story_arcs" not in raw_json:
-                        raw_json["potential_story_arcs"] = raw_json.pop("story_arcs")
-
-                    # Normalize hero/setting/catalyst fields
-                    for key in ["heroes", "settings", "catalysts"]:
-                        if key in raw_json and isinstance(raw_json[key], list):
-                            for item in raw_json[key]:
-                                if not isinstance(item, dict): continue
-                                if "name" in item and "text" not in item:
-                                    item["text"] = item.pop("name")
-                                if "id" not in item:
-                                    item["id"] = f"{key[0]}{raw_json[key].index(item)+1}"
-
-                    if "potential_story_arcs" in raw_json and isinstance(raw_json["potential_story_arcs"], list):
-                        for arc in raw_json["potential_story_arcs"]:
-                            if not isinstance(arc, dict): continue
-                            if "acts" in arc and isinstance(arc["acts"], list):
-                                new_acts = []
-                                for i, act in enumerate(arc["acts"]):
-                                    if isinstance(act, str):
-                                        new_acts.append({
-                                            "act_number": i + 1,
-                                            "title": f"Act {i+1}",
-                                            "description": act,
-                                            "starting_point": "Start",
-                                            "ending_point": "End",
-                                            "branch_options": []
-                                        })
-                                    elif isinstance(act, dict):
-                                        if "act" in act and "act_number" not in act:
-                                            act["act_number"] = act.pop("act")
-                                        if "act_number" not in act:
-                                            act["act_number"] = i + 1
-                                        for field in ["title", "starting_point", "ending_point", "description"]:
-                                            if field not in act: act[field] = "..."
-                                        if "plot_beats" not in act: act["plot_beats"] = []
-                                        if "branch_options" not in act: act["branch_options"] = []
-                                        new_acts.append(act)
-                                arc["acts"] = new_acts
-                            else:
-                                arc["acts"] = []
-
-                    data = models.AdventureSetupResponse(**raw_json)
-                    logger.info("Manual parse fallback succeeded for adventure setup.")
-                except Exception as parse_err:
-                    logger.error(f"Manual parse fallback failed for adventure setup: {parse_err}")
-                    raise ValueError(f"Invalid LLM response and fallback failed: {raw_text}")
-            else:
-                raise ValueError("Invalid LLM response: Empty body or blocked")
-        else:
-            data = response.parsed
-
-        if data.potential_story_arcs:
-            logger.info(f"Arc 0 keys: {data.potential_story_arcs[0].model_dump().keys()}")
+            clean_json = raw_text
+            if "```json" in raw_text:
+                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+            raw_json = json.loads(clean_json)
+            data = models.AdventureSetupResponse(**raw_json)
+        except Exception:
+            # Simple manual parse if response is a raw list
+            data = models.AdventureSetupResponse(premises=json.loads(clean_json), selected_vocabulary=words)
 
         data.selected_vocabulary = words
-        data.vocabulary_min_rank = vocab_data["min_rank"]
-        data.vocabulary_max_rank = vocab_data["max_rank"]
-        logger.info("Adventure setup generated successfully.")
         return data
     except Exception as e:
-        logger.exception("CRITICAL: Failed to generate adventure setup")
+        logger.exception("Failed to generate story options")
+        raise e
+
+def generate_story_dag(request: models.GenerateDAGRequest) -> models.StoryDAG:
+    logger.info(f"Generating Story DAG for premise: {request.premise.title}")
+
+    # Fresh list of 25 words from VocabularyEngine
+    engine = VocabularyEngine()
+    words = engine.fetch_vocabulary(
+        target_rank=request.student_state.current_rank_index,
+        semantic_query=f"{request.premise.title} {request.premise.setting}",
+        pos_distribution={"n.": 0.4, "adj.": 0.4, "v.": 0.2},
+        state_distribution={models.WordState.UNSEEN: 0.8, models.WordState.LEARNING: 0.2},
+        word_count=25
+    )
+
+    client = get_client()
+
+    if not os.path.exists(STORY_LOGIC_PATH):
+        story_logic = "Use Directed Acyclic Graph (DAG) for Acts (Levels 0-3)."
+    else:
+        with open(STORY_LOGIC_PATH, "r") as f:
+            story_logic = f.read()
+
+    prompt = f"""
+    You are an expert interactive fiction designer. Create a Directed Acyclic Graph (DAG) for Act Blueprints.
+
+    PREMISE: {request.premise.model_dump_json()}
+    VOCABULARY POOL: {", ".join(words)}
+
+    CYOA STRUCTURE LAWS:
+    {story_logic}
+
+    TASK:
+    1. Create a Directed Acyclic Graph (DAG) of nodes (Levels 0 to 3).
+    2. Level 0: The 'entry_node'.
+    3. Level 1 & 2: Internal nodes. Each MUST branch into 2 next_node_ids.
+    4. Level 3: Terminal nodes (ending_point reached, next_node_ids empty).
+    5. Structural consistency: Ensure no dead ends before Level 3. Every node at Level L must point to nodes at Level L+1.
+
+    SCHEMA for each node in 'nodes' (Dict[id, object]):
+    - 'node_id': unique string (e.g. 'n0', 'n1_1', 'n1_2', 'n2_1'...)
+    - 'act_number': (integer 1-5+)
+    - 'level': (integer 0-3)
+    - 'title': short title
+    - 'description': high-level overview
+    - 'plot_beats': List of 4-5 specific chronological events
+    - 'starting_point': text
+    - 'ending_point': text
+    - 'branch_options': List of 2 options (except level 3)
+    - 'next_node_ids': List of ids
+
+    Output MUST be a strict JSON matching models.StoryDAG.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model=SCENE_MODEL_ID,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+
+        raw_text = response.text
+        clean_json = raw_text
+        if "```json" in raw_text:
+            clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+
+        raw_json = json.loads(clean_json)
+
+        # Ensure premise_id is present
+        if "premise_id" not in raw_json:
+            raw_json["premise_id"] = request.premise.id
+
+        # Robust normalization for 'nodes' which might be a list or dict
+        if "nodes" in raw_json and isinstance(raw_json["nodes"], list):
+            new_nodes = {}
+            for node in raw_json["nodes"]:
+                if isinstance(node, dict) and "node_id" in node:
+                    new_nodes[node["node_id"]] = node
+            raw_json["nodes"] = new_nodes
+
+        # Simple normalization if 'entry_node_id' is missing
+        if "entry_node_id" not in raw_json and "nodes" in raw_json:
+            # Pick the level 0 node
+            for nid, node in raw_json["nodes"].items():
+                if node.get("level") == 0:
+                    raw_json["entry_node_id"] = nid
+                    break
+
+            # Fallback if no level 0 found
+            if "entry_node_id" not in raw_json and raw_json["nodes"]:
+                raw_json["entry_node_id"] = list(raw_json["nodes"].keys())[0]
+
+        return models.StoryDAG(**raw_json)
+    except Exception as e:
+        logger.exception("Failed to generate story DAG")
         raise e
 
 def onboarding_final_decision(request: models.GenerateArcRequest) -> models.PedagogicalDecision:
@@ -301,87 +293,11 @@ def generate_interview_response(request: models.InterviewChatRequest) -> models.
         logger.exception("CRITICAL: Failed generate_interview_response")
         raise e
 
-def generate_story_arc(request: models.GenerateArcRequest) -> models.StoryArc:
-    logger.info(f"Generating Story Arc for {request.story_elements.hero_name}...")
-    client = get_client()
-    prompt = f"""
-    You are an expert Story Architect for an ESL learning platform.
-    Create a 5-act branching story blueprint based on these elements:
-    HERO: {request.story_elements.hero_name}
-    SETTING: {request.story_elements.setting}
-    GOAL: {request.story_elements.goal}
-
-    The story should follow a 5-act structure:
-    Act 1: Introduction
-    Act 2: Inciting Incident
-    Act 3: Rising Action
-    Act 4: Climax
-    Act 5: Resolution
-
-    Output MUST be a strict JSON matching StoryArc schema.
-    """
-    try:
-        response = client.models.generate_content(
-            model=SCENE_MODEL_ID,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            )
-        )
-
-        raw_text = getattr(response, 'text', 'None')
-        if not raw_text or raw_text == 'None':
-             raise ValueError("Invalid Story Arc response: Empty body")
-
-        try:
-            clean_json = raw_text
-            if "```json" in raw_text:
-                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw_text:
-                clean_json = raw_text.split("```")[1].split("```")[0].strip()
-
-            try:
-                raw_json = json.loads(clean_json)
-            except json.JSONDecodeError:
-                last_brace = clean_json.rfind("}")
-                if last_brace != -1:
-                    raw_json = json.loads(clean_json[:last_brace+1])
-                else:
-                    raise
-
-            # Normalize acts if they are called something else or have different structure
-            if "acts" in raw_json and isinstance(raw_json["acts"], list):
-                new_acts = []
-                for i, act in enumerate(raw_json["acts"]):
-                    if isinstance(act, str):
-                        new_acts.append({
-                            "act_number": i + 1,
-                            "title": f"Act {i+1}",
-                            "description": act,
-                            "starting_point": "...",
-                            "ending_point": "..."
-                        })
-                    elif isinstance(act, dict):
-                        if "act" in act and "act_number" not in act:
-                            act["act_number"] = act.pop("act")
-                        for field in ["title", "starting_point", "ending_point", "description"]:
-                            if field not in act: act[field] = "..."
-                        if "plot_beats" not in act: act["plot_beats"] = []
-                        new_acts.append(act)
-                raw_json["acts"] = new_acts
-
-            return models.StoryArc(**raw_json)
-        except Exception as parse_err:
-            logger.error(f"Manual parse failed for story arc: {parse_err}")
-            raise ValueError(f"Invalid Story Arc response: {raw_text}")
-    except Exception as e:
-        logger.exception("CRITICAL: Failed generate_story_arc")
-        raise e
 
 def generate_act_content(request: models.ActContentRequest) -> models.ActContentResponse:
-    logger.info(f"Generating Act {request.act_blueprint.act_number} content for {request.story_arc_title}...")
+    logger.info(f"Generating Act {request.node.act_number} content for {request.story_title}...")
     client = get_client()
-    bp = request.act_blueprint
+    node = request.node
 
     # Dynamic structure logic
     struct = get_target_structure(request.student_state.current_estimated_level)
@@ -389,20 +305,23 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     sentences_per_paragraph = request.sentences_per_paragraph or struct["sentences_per_paragraph"]
 
     prompt = f"""
-    You are an expert Children's Book Author. Write Act {bp.act_number} of an interactive story.
+    You are an expert Children's Book Author. Write Act {node.act_number} of an interactive story.
 
     STORY CONTEXT:
-    - TITLE: {request.story_arc_title}
-    - HERO/SETTING/CATALYST: {request.hero_description}, {request.setting_description}, {request.catalyst_description}
-    - PLOT BEATS: {", ".join(bp.plot_beats)}
-    - BRIDGE: Start at '{bp.starting_point}' and end exactly at '{bp.ending_point}'.
+    - TITLE: {request.story_title}
+    - HERO: {request.hero_description}
+    - SETTING: {request.setting_description}
+    - CATALYST: {request.catalyst_description}
+    - PLOT BEATS: {", ".join(node.plot_beats)}
+    - BRIDGE: Start at '{node.starting_point}' and end exactly at '{node.ending_point}'.
 
     LITERARY CONSTRAINTS (LEVEL: {request.student_state.current_estimated_level}):
     - VOICE: Warm and vivid. Use sensory details and internal feelings.
     - STRUCTURE: You MUST output 'scene_paragraphs' as an array of arrays: [[sentence1, sentence2...], [sentence1...]].
     - CONSTRAINT: EXACTLY {num_paragraphs} paragraphs, each with EXACTLY {sentences_per_paragraph} sentences.
-    - VOCABULARY: Weave in at least 10 words from: {", ".join(request.target_words)}.
-    - ENDING: The very last sentence of the final paragraph must perfectly set up these choices: {", ".join(bp.branch_options)}.
+    - VOCABULARY POOL: {", ".join(request.target_words)}.
+    - REQUIREMENT: Weave in at least 10 words from the VOCABULARY POOL.
+    - ENDING: The very last sentence of the final paragraph must perfectly set up these choices: {", ".join(node.branch_options)}.
 
     JSON OUTPUT REQUIREMENTS:
     1. 'scene_paragraphs': List of lists of sentences as defined above.
