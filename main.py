@@ -23,6 +23,10 @@ logging.basicConfig(
 
 app = FastAPI(title="Adaptive English Learning API")
 
+@app.on_event("startup")
+async def startup_event():
+    llm_service.embedding_sanity_check()
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logging.error(f"Validation error: {exc.errors()}")

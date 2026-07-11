@@ -4,6 +4,5 @@ pydantic
 google-genai
 python-dotenv
 python-multipart
-sentence-transformers
-scikit-learn
 numpy
+scikit-learn
