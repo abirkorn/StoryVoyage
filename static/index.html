@@ -61,32 +61,28 @@
                                 <label for="launchRank" class="block font-medium text-xs text-gray-500 uppercase">Rank Index</label>
                                 <input type="number" id="launchRank" value="100" class="w-full border p-2 rounded">
                             </div>
-                            <div>
-                                <label for="launchCount" class="block font-medium text-xs text-gray-500 uppercase">Word Count</label>
-                                <input type="number" id="launchCount" value="100" class="w-full border p-2 rounded">
-                            </div>
-                            <div>
-                                <label for="launchPct" class="block font-medium text-xs text-gray-500 uppercase">Fraction Above (0.1 = 10%)</label>
-                                <input type="number" step="0.01" id="launchPct" value="0.10" class="w-full border p-2 rounded">
+                            <div class="col-span-2">
+                                <label for="launchSemantic" class="block font-medium text-xs text-gray-500 uppercase">Semantic Query (Optional)</label>
+                                <input type="text" id="launchSemantic" value="" class="w-full border p-2 rounded" placeholder="e.g. dragon discovery">
                             </div>
                         </div>
                         <button onclick="setupAdventure()" id="launchBtn" class="bg-blue-600 text-white px-6 py-2 rounded font-medium w-full hover:bg-blue-700">Generate Options</button>
                         <div id="launchResult" class="mt-8 space-y-4 hidden">
-                            <div class="flex justify-end">
-                                <button onclick="applyGuardrails()" id="guardBtn" class="bg-orange-500 text-white px-3 py-1 rounded text-xs font-bold hover:bg-orange-600">Apply Post-hoc Guardrails 🛡️</button>
-                            </div>
-                            <div class="grid grid-cols-3 gap-2 text-xs">
-                                <div class="p-2 border bg-blue-50"><b>Heroes:</b> <ul id="listHeroes" class="italic"></ul></div>
-                                <div class="p-2 border bg-green-50"><b>Settings:</b> <ul id="listSettings" class="italic"></ul></div>
-                                <div class="p-2 border bg-purple-50"><b>Catalysts:</b> <ul id="listCatalysts" class="italic"></ul></div>
-                            </div>
+                            <div id="premisesList" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
                             <div>
                                 <h3 class="font-bold text-gray-700 mb-1 uppercase text-xs">
-                                    Words Sent to LLM (Rank Range: <span id="rankRange">0-0</span>):
+                                    Step 1: Focused Vocabulary Pool:
                                 </h3>
                                 <div id="launchWords" class="text-[10px] text-gray-500 flex flex-wrap gap-2 p-2 bg-gray-100 rounded border"></div>
                             </div>
                             <div class="json-inspector" id="launchJson"></div>
+                        </div>
+
+                        <!-- DAG View -->
+                        <div id="dagView" class="mt-8 space-y-4 hidden p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                            <h2 class="text-lg font-bold text-purple-800 uppercase text-xs">Step 2: Story Arc DAG</h2>
+                            <div id="dagNodes" class="grid grid-cols-1 gap-2"></div>
+                            <div class="json-inspector" id="dagJson"></div>
                         </div>
                     </div>
                 </div>
@@ -272,35 +268,30 @@
 
         async function setupAdventure() {
             const btn = document.getElementById('launchBtn');
-            btn.disabled = true; btn.innerText = "Building...";
+            btn.disabled = true; btn.innerText = "Building Step 1...";
             const body = {
                 rank_index: parseInt(document.getElementById('launchRank').value),
                 genre: document.getElementById('launchGenre').value,
-                num_words: parseInt(document.getElementById('launchCount').value),
-                pct_above: parseFloat(document.getElementById('launchPct').value)
+                semantic_query: document.getElementById('launchSemantic').value
             };
             try {
                 const data = await apiCall('/adventure/setup', body);
                 document.getElementById('launchResult').classList.remove('hidden');
+                document.getElementById('dagView').classList.add('hidden');
 
-                document.getElementById('listHeroes').innerHTML = data.heroes.map(h => `<li>${h.text}</li>`).join('');
-                document.getElementById('listSettings').innerHTML = data.settings.map(s => `<li>${s.text}</li>`).join('');
-                document.getElementById('listCatalysts').innerHTML = data.catalysts.map(c => `<li>${c.text}</li>`).join('');
-                document.getElementById('launchWords').innerHTML = data.selected_vocabulary.map(w => `<span class='bg-white px-1 border rounded'>${w}</span>`).join('');
-                document.getElementById('rankRange').innerText = `${data.vocabulary_min_rank}-${data.vocabulary_max_rank}`;
-
-                // Add "Generate Act" buttons for each arc
-                const arcList = data.potential_story_arcs.map((arc, i) => `
-                    <div class="p-2 border rounded bg-white flex justify-between items-center">
-                        <div>
-                            <p class="font-bold text-xs">${arc.title}</p>
-                            <p class="text-[10px] text-gray-500">${arc.acts[0].description}...</p>
-                        </div>
-                        <button onclick="sendToActGenerator(${i})" class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-[10px] font-bold">Pick & Generate Act 1</button>
+                const premisesList = document.getElementById('premisesList');
+                premisesList.innerHTML = data.premises.map((p, i) => `
+                    <div class="p-4 border rounded bg-white shadow-sm hover:border-blue-400 transition-all cursor-pointer" onclick="generateDAG(${i})">
+                        <p class="font-bold text-blue-700">${p.title}</p>
+                        <p class="text-xs text-gray-500 mt-2"><b>Hero:</b> ${p.hero}</p>
+                        <p class="text-xs text-gray-500"><b>Setting:</b> ${p.setting}</p>
+                        <p class="text-xs text-gray-500"><b>Catalyst:</b> ${p.catalyst}</p>
+                        <button class="mt-4 w-full bg-blue-50 text-blue-600 text-[10px] font-bold py-1 rounded">Select Premise & Build DAG</button>
                     </div>
                 `).join('');
-                document.getElementById('launchResult').classList.remove('hidden');
-                document.getElementById('launchJson').innerHTML = `<div class="space-y-2 mb-4">${arcList}</div>` + `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+
+                document.getElementById('launchWords').innerHTML = data.selected_vocabulary.map(w => `<span class='bg-white px-1 border rounded'>${w}</span>`).join('');
+                document.getElementById('launchJson').innerText = JSON.stringify(data, null, 2);
 
                 gState.rank = body.rank_index;
                 gState.lastLaunchData = data;
@@ -308,26 +299,47 @@
             } catch (e) {} finally { btn.disabled = false; btn.innerText = "Generate Options"; }
         }
 
-        function sendToActGenerator(arcIndex) {
-            const arc = gState.lastLaunchData.potential_story_arcs[arcIndex];
-            const data = gState.lastLaunchData;
+        async function generateDAG(premiseIndex) {
+            const premise = gState.lastLaunchData.premises[premiseIndex];
+            gState.selectedPremise = premise;
+            const btn = document.querySelector(`#premisesList > div:nth-child(${premiseIndex+1}) button`);
+            btn.innerText = "Generating DAG...";
+            try {
+                const data = await apiCall('/adventure/generate-dag', {
+                    premise: premise,
+                    student_state: { current_estimated_level: 'A2', current_rank_index: gState.rank }
+                });
+                gState.lastDAG = data;
+                document.getElementById('dagView').classList.remove('hidden');
+                document.getElementById('dagJson').innerText = JSON.stringify(data, null, 2);
 
-            // Map the arc to specific hero/setting/catalyst using IDs
-            const hero = data.heroes.find(h => h.id === arc.hero_id) || data.heroes[0];
-            const setting = data.settings.find(s => s.id === arc.setting_id) || data.settings[0];
-            const catalyst = data.catalysts.find(c => c.id === arc.catalyst_id) || data.catalysts[0];
+                const dagNodes = document.getElementById('dagNodes');
+                dagNodes.innerHTML = Object.values(data.nodes).sort((a,b) => a.level - b.level).map(node => `
+                    <div class="p-2 border rounded bg-white flex justify-between items-center text-xs">
+                        <div>
+                            <span class="font-bold text-purple-700">[L${node.level}] ${node.title}</span>
+                            <p class="text-[10px] text-gray-400">${node.description}</p>
+                        </div>
+                        <button onclick="sendNodeToActGenerator('${node.node_id}')" class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-[10px] font-bold">Gen Prose</button>
+                    </div>
+                `).join('');
+                window.scrollTo({ top: document.getElementById('dagView').offsetTop, behavior: 'smooth' });
+            } catch (e) {} finally { btn.innerText = "Select Premise & Build DAG"; }
+        }
 
-            document.getElementById('actStoryTitle').value = arc.title;
+        function sendNodeToActGenerator(nodeId) {
+            const node = gState.lastDAG.nodes[nodeId];
+            const premise = gState.selectedPremise;
+
+            document.getElementById('actStoryTitle').value = premise.title;
             document.getElementById('actGenre').value = document.getElementById('launchGenre').value;
-            document.getElementById('actHeroDesc').value = hero.description;
-            document.getElementById('actSettingDesc').value = setting.description;
-            document.getElementById('actCatalystDesc').value = catalyst.description;
-            document.getElementById('actPrev').value = "";
-            document.getElementById('actNext').value = arc.acts[1].title;
+            document.getElementById('actHeroDesc').value = premise.hero;
+            document.getElementById('actSettingDesc').value = premise.setting;
+            document.getElementById('actCatalystDesc').value = premise.catalyst;
 
-            document.getElementById('actBlueprintInput').value = JSON.stringify(arc.acts[0], null, 2);
-            // Send a pool of 25 words
-            document.getElementById('actWordsInput').value = data.selected_vocabulary.slice(0, 25).join(', ');
+            document.getElementById('actBlueprintInput').value = JSON.stringify(node, null, 2);
+            // In a real flow, target words would come from the DAG call metadata
+            document.getElementById('actWordsInput').value = "magic, secret, adventure";
             showTab('act');
         }
 
@@ -399,19 +411,18 @@
             try {
                 const numParas = document.getElementById('actNumParas').value;
                 const sentPerPara = document.getElementById('actSentPerPara').value;
+                const node = JSON.parse(document.getElementById('actBlueprintInput').value);
                 const body = {
-                    story_arc_title: document.getElementById('actStoryTitle').value,
-                    act_blueprint: JSON.parse(document.getElementById('actBlueprintInput').value),
+                    story_title: document.getElementById('actStoryTitle').value,
+                    node: node,
                     target_words: document.getElementById('actWordsInput').value.split(',').map(w => w.trim()).filter(w => w),
-                    student_state: { current_estimated_level: 'A1-Sub1' },
+                    student_state: { current_estimated_level: 'A2-Sub1' },
                     num_paragraphs: numParas ? parseInt(numParas) : null,
                     sentences_per_paragraph: sentPerPara ? parseInt(sentPerPara) : null,
                     hero_description: document.getElementById('actHeroDesc').value,
                     setting_description: document.getElementById('actSettingDesc').value,
                     catalyst_description: document.getElementById('actCatalystDesc').value,
-                    genre: document.getElementById('actGenre').value,
-                    previous_act_title: document.getElementById('actPrev').value,
-                    next_act_title: document.getElementById('actNext').value
+                    genre: document.getElementById('actGenre').value
                 };
                 const data = await apiCall('/story/generate-act-content', body);
                 document.getElementById('actResult').classList.remove('hidden');
@@ -456,31 +467,25 @@
             u_playAct();
         }
         async function u_playAct() {
-            const arc = gState.arc;
-            const lData = gState.lastLaunchData;
-            const actIdx = gState.act - 1;
+            const dag = gState.lastDAG;
+            const premise = gState.selectedPremise;
 
-            const hero = lData.heroes.find(h => h.id === arc.hero_id) || lData.heroes[0];
-            const setting = lData.settings.find(s => s.id === arc.setting_id) || lData.settings[0];
-            const catalyst = lData.catalysts.find(c => c.id === arc.catalyst_id) || lData.catalysts[0];
+            // For unified flow simplicity, we'll follow the entry node or last selection
+            const node = gState.currentNode || dag.nodes[dag.entry_node_id];
 
             const body = {
-                story_arc_title: arc.title,
-                act_blueprint: arc.acts[actIdx],
-                // Pool of 20 words for unified flow
-                target_words: lData.selected_vocabulary.slice(actIdx * 10, (actIdx + 1) * 10 + 10),
-                student_state: { current_estimated_level: 'A1-Sub1' },
-                num_paragraphs: 3,
-                sentences_per_paragraph: 4,
-                hero_description: hero.description,
-                setting_description: setting.description,
-                catalyst_description: catalyst.description,
-                genre: document.getElementById('launchGenre').value,
-                previous_act_title: actIdx > 0 ? arc.acts[actIdx-1].title : null,
-                next_act_title: actIdx < 4 ? arc.acts[actIdx+1].title : null
+                story_title: premise.title,
+                node: node,
+                target_words: gState.lastLaunchData.selected_vocabulary.slice(0, 20),
+                student_state: { current_estimated_level: 'A2' },
+                hero_description: premise.hero,
+                setting_description: premise.setting,
+                catalyst_description: premise.catalyst,
+                genre: document.getElementById('launchGenre').value
             };
             const actData = await apiCall('/story/generate-act-content', body);
             gState.lastActData = actData;
+            gState.currentNode = node;
             document.getElementById('u-game-area').innerText = actData.scene_text;
             document.getElementById('u-assessment').classList.remove('hidden');
             document.getElementById('u-question').innerText = actData.assessment_tasks.comprehension_question.question_text_hebrew;
@@ -496,7 +501,13 @@
             document.getElementById('u-next').classList.remove('hidden');
         }
         function u_next() {
-            gState.act++; if (gState.act > 5) return alert("Finished!");
+            const nextIds = gState.currentNode.next_node_ids;
+            if (!nextIds || nextIds.length === 0) return alert("Story Finished!");
+
+            // Pick first branch for simplified unified flow
+            gState.currentNode = gState.lastDAG.nodes[nextIds[0]];
+            gState.act++;
+
             document.getElementById('u-next').classList.add('hidden');
             document.getElementById('u-feedback').innerText = '';
             u_playAct();
