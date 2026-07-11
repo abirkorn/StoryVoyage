@@ -1,20 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Dict, Any, Optional, Union
-from enum import Enum
 
 # --- Common Models ---
-
-class WordState(str, Enum):
-    MASTERED = "MASTERED"
-    LEARNING = "LEARNING"
-    UNSEEN = "UNSEEN"
-
-class VocabularyWord(BaseModel):
-    w: str
-    pos: str
-    rank: int
-    state: WordState = WordState.UNSEEN
-    theme: Optional[str] = None
 
 class AssessmentRecord(BaseModel):
     category: str = ""
@@ -43,41 +30,38 @@ class StudentState(BaseModel):
 class AdventureSetupRequest(BaseModel):
     rank_index: int
     genre: str
-    num_words: int = 40
-    semantic_query: Optional[str] = None
+    num_words: int = 100
+    pct_above: float = 0.1
 
-class StoryPremise(BaseModel):
-    id: str
-    hero: str
-    setting: str
-    catalyst: str
-    title: str
+class LaunchpadAnchor(BaseModel):
+    id: str = ""
+    text: str = ""
+    description: str = ""
+
+class ActBlueprint(BaseModel):
+    act_number: int = 0
+    title: str = ""
+    starting_point: str = ""
+    ending_point: str = ""
+    description: str = ""
+    plot_beats: List[str] = Field(default_factory=list)
+    branch_options: List[str] = Field(default_factory=list)
+
+class StoryArc(BaseModel):
+    title: str = ""
+    hero_id: str = ""
+    setting_id: str = ""
+    catalyst_id: str = ""
+    acts: List[ActBlueprint] = Field(default_factory=list)
 
 class AdventureSetupResponse(BaseModel):
-    premises: List[StoryPremise] = Field(default_factory=list)
+    heroes: List[LaunchpadAnchor] = Field(default_factory=list)
+    settings: List[LaunchpadAnchor] = Field(default_factory=list)
+    catalysts: List[LaunchpadAnchor] = Field(default_factory=list)
+    potential_story_arcs: List[StoryArc] = Field(default_factory=list)
     selected_vocabulary: List[str] = Field(default_factory=list)
-
-class DAGNode(BaseModel):
-    node_id: str
-    act_number: int
-    level: int # Depth in the DAG (0-3 as requested)
-    title: str
-    description: str
-    plot_beats: List[str] = Field(default_factory=list)
-    starting_point: str
-    ending_point: str
-    branch_options: List[str] = Field(default_factory=list)
-    next_node_ids: List[str] = Field(default_factory=list)
-
-class StoryDAG(BaseModel):
-    premise_id: str
-    nodes: Dict[str, DAGNode] = Field(default_factory=dict)
-    entry_node_id: str
-
-class GenerateDAGRequest(BaseModel):
-    premise: StoryPremise
-    target_words: List[str] = Field(default_factory=list)
-    student_state: StudentState
+    vocabulary_min_rank: int = 0
+    vocabulary_max_rank: int = 0
 
 class GuardrailRequest(BaseModel):
     data: AdventureSetupResponse
@@ -118,16 +102,18 @@ class GenerateArcRequest(BaseModel):
     genre_theme: Optional[str] = None
 
 class ActContentRequest(BaseModel):
-    story_title: str
-    node: DAGNode
+    story_arc_title: str
+    act_blueprint: ActBlueprint
     target_words: List[str] = Field(default_factory=list)
     student_state: StudentState
-    num_paragraphs: Optional[int] = None
-    sentences_per_paragraph: Optional[int] = None
-    hero_description: str
-    setting_description: str
-    catalyst_description: str
+    num_paragraphs: Optional[int] = 3
+    sentences_per_paragraph: Optional[int] = 4
+    hero_description: Optional[str] = None
+    setting_description: Optional[str] = None
+    catalyst_description: Optional[str] = None
     genre: Optional[str] = None
+    previous_act_title: Optional[str] = None
+    next_act_title: Optional[str] = None
 
 # --- Assessment & Scene Models ---
 
