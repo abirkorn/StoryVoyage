@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import models
 import llm_service
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -35,6 +36,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "body": exc.body},
     )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logging.exception("Unhandled exception occurred")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+            "traceback": traceback.format_exc()
+        },
+    )
+
 # CORS configuration
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
@@ -57,10 +70,12 @@ async def verify_token(x_app_token: str = Header(None)):
 
 @app.post("/adventure/setup", response_model=models.AdventureSetupResponse)
 async def adventure_setup(request: models.AdventureSetupRequest, token: str = Depends(verify_token)):
+    logging.info(f"API Request: /adventure/setup - {request.model_dump_json()}")
     return llm_service.generate_story_options(request)
 
 @app.post("/adventure/generate-dag", response_model=models.StoryDAG)
 async def generate_dag(request: models.GenerateDAGRequest, token: str = Depends(verify_token)):
+    logging.info(f"API Request: /adventure/generate-dag - {request.model_dump_json()}")
     return llm_service.generate_story_dag(request)
 
 @app.post("/adventure/apply-guardrails", response_model=models.AdventureSetupResponse)
