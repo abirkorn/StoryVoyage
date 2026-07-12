@@ -38,7 +38,7 @@ def get_client():
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         logger.error("GEMINI_API_KEY not found in environment!")
-    return genai.Client(api_key=key)
+    return genai.Client(api_key=key, http_options={"api_version": "v1"})
 
 def get_target_structure(level: str) -> Dict[str, int]:
     """
@@ -90,6 +90,23 @@ def get_catalog_words(rank_index: int, x: int = 100, pct_above: float = 0.1) -> 
         logger.error(f"Error in get_catalog_words: {e}")
         return {"words": ["water", "tree", "friend", "happy", "big"], "min_rank": 0, "max_rank": 0}
 
+def embedding_sanity_check():
+    """Startup sanity check for Gemini Embedding API."""
+    logger.info("Running embedding sanity check...")
+    try:
+        client = get_client()
+        res = client.models.embed_content(
+            model="models/gemini-embedding-2",
+            contents=["Sanity check string"],
+            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
+        )
+        if res.embeddings:
+            logger.info("Embedding sanity check PASSED.")
+            return True
+    except Exception as e:
+        logger.error(f"Embedding sanity check FAILED: {e}")
+    return False
+
 def generate_story_options(request: models.AdventureSetupRequest) -> models.AdventureSetupResponse:
     logger.info(f"Generating Story Options. Genre: {request.genre}, Rank: {request.rank_index}")
 
@@ -129,18 +146,24 @@ def generate_story_options(request: models.AdventureSetupRequest) -> models.Adve
         )
 
         raw_text = response.text
-        # Apply normalization fallback if needed
-        try:
-            clean_json = raw_text
-            if "```json" in raw_text:
-                clean_json = raw_text.split("```json")[1].split("```")[0].strip()
-            raw_json = json.loads(clean_json)
-            data = models.AdventureSetupResponse(**raw_json)
-        except Exception:
-            # Simple manual parse if response is a raw list
-            data = models.AdventureSetupResponse(premises=json.loads(clean_json), selected_vocabulary=words)
+        # Basic JSON cleaning
+        clean_json = raw_text
+        if "```json" in raw_text:
+            clean_json = raw_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw_text:
+            clean_json = raw_text.split("```")[1].split("```")[0].strip()
 
-        data.selected_vocabulary = words
+        raw_json = json.loads(clean_json)
+
+        # Pydantic validation
+        if isinstance(raw_json, list):
+             data = models.AdventureSetupResponse(premises=raw_json, selected_vocabulary=words)
+        elif "premises" in raw_json:
+             data = models.AdventureSetupResponse(**raw_json)
+             data.selected_vocabulary = words
+        else:
+             raise ValueError("Unexpected LLM response format for Premises")
+
         return data
     except Exception as e:
         logger.exception("Failed to generate story options")
@@ -149,12 +172,12 @@ def generate_story_options(request: models.AdventureSetupRequest) -> models.Adve
 def generate_story_dag(request: models.GenerateDAGRequest) -> models.StoryDAG:
     logger.info(f"Generating Story DAG for premise: {request.premise.title}")
 
-    # Fresh list of 25 words from VocabularyEngine
+    # Fresh list of 25 words (heavy on verbs as requested)
     engine = VocabularyEngine()
     words = engine.fetch_vocabulary(
         target_rank=request.student_state.current_rank_index,
         semantic_query=f"{request.premise.title} {request.premise.setting}",
-        pos_distribution={"n.": 0.4, "adj.": 0.4, "v.": 0.2},
+        pos_distribution={"n.": 0.2, "adj.": 0.2, "v.": 0.6},
         state_distribution={models.WordState.UNSEEN: 0.8, models.WordState.LEARNING: 0.2},
         word_count=25
     )
@@ -168,32 +191,28 @@ def generate_story_dag(request: models.GenerateDAGRequest) -> models.StoryDAG:
             story_logic = f.read()
 
     prompt = f"""
-    You are an expert interactive fiction designer. Create a Directed Acyclic Graph (DAG) for Act Blueprints.
+    You are an expert interactive fiction designer. Create a Directed Acyclic Graph (DAG) of acts.
 
     PREMISE: {request.premise.model_dump_json()}
     VOCABULARY POOL: {", ".join(words)}
 
-    CYOA STRUCTURE LAWS:
+    CYOA DAG RULES:
     {story_logic}
-
-    TASK:
-    1. Create a Directed Acyclic Graph (DAG) of nodes (Levels 0 to 3).
-    2. Level 0: The 'entry_node'.
-    3. Level 1 & 2: Internal nodes. Each MUST branch into 2 next_node_ids.
-    4. Level 3: Terminal nodes (ending_point reached, next_node_ids empty).
-    5. Structural consistency: Ensure no dead ends before Level 3. Every node at Level L must point to nodes at Level L+1.
+    - Level 0: 1 Root Act (Setup, ends with first choice).
+    - Level 1 & 2: Branching acts based on Choice Archetypes (Bravery vs. Caution, Altruism vs. Objective, Logic vs. Whimsy).
+    - Level 3: Leaf Acts (Resolution, organic closure, no dead ends).
 
     SCHEMA for each node in 'nodes' (Dict[id, object]):
     - 'node_id': unique string (e.g. 'n0', 'n1_1', 'n1_2', 'n2_1'...)
-    - 'act_number': (integer 1-5+)
-    - 'level': (integer 0-3)
+    - 'act_number': integer
+    - 'level': integer (0-3)
     - 'title': short title
     - 'description': high-level overview
     - 'plot_beats': List of 4-5 specific chronological events
     - 'starting_point': text
     - 'ending_point': text
     - 'branch_options': List of 2 options (except level 3)
-    - 'next_node_ids': List of ids
+    - 'next_node_ids': List of node_ids this act branches into
 
     Output MUST be a strict JSON matching models.StoryDAG.
     """
@@ -212,11 +231,7 @@ def generate_story_dag(request: models.GenerateDAGRequest) -> models.StoryDAG:
 
         raw_json = json.loads(clean_json)
 
-        # Ensure premise_id is present
-        if "premise_id" not in raw_json:
-            raw_json["premise_id"] = request.premise.id
-
-        # Robust normalization for 'nodes' which might be a list or dict
+        # Robust normalization for 'nodes'
         if "nodes" in raw_json and isinstance(raw_json["nodes"], list):
             new_nodes = {}
             for node in raw_json["nodes"]:
@@ -224,17 +239,17 @@ def generate_story_dag(request: models.GenerateDAGRequest) -> models.StoryDAG:
                     new_nodes[node["node_id"]] = node
             raw_json["nodes"] = new_nodes
 
-        # Simple normalization if 'entry_node_id' is missing
         if "entry_node_id" not in raw_json and "nodes" in raw_json:
             # Pick the level 0 node
             for nid, node in raw_json["nodes"].items():
                 if node.get("level") == 0:
                     raw_json["entry_node_id"] = nid
                     break
-
-            # Fallback if no level 0 found
             if "entry_node_id" not in raw_json and raw_json["nodes"]:
                 raw_json["entry_node_id"] = list(raw_json["nodes"].keys())[0]
+
+        if "premise_id" not in raw_json:
+            raw_json["premise_id"] = request.premise.id
 
         return models.StoryDAG(**raw_json)
     except Exception as e:
@@ -309,9 +324,8 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
 
     STORY CONTEXT:
     - TITLE: {request.story_title}
-    - HERO: {request.hero_description}
-    - SETTING: {request.setting_description}
-    - CATALYST: {request.catalyst_description}
+    - HERO/SETTING/CATALYST: {request.hero_description}, {request.setting_description}, {request.catalyst_description}
+    - ACT DESCRIPTION: {node.description}
     - PLOT BEATS: {", ".join(node.plot_beats)}
     - BRIDGE: Start at '{node.starting_point}' and end exactly at '{node.ending_point}'.
 
@@ -319,19 +333,19 @@ def generate_act_content(request: models.ActContentRequest) -> models.ActContent
     - VOICE: Warm and vivid. Use sensory details and internal feelings.
     - STRUCTURE: You MUST output 'scene_paragraphs' as an array of arrays: [[sentence1, sentence2...], [sentence1...]].
     - CONSTRAINT: EXACTLY {num_paragraphs} paragraphs, each with EXACTLY {sentences_per_paragraph} sentences.
-    - VOCABULARY POOL: {", ".join(request.target_words)}.
-    - REQUIREMENT: Weave in at least 10 words from the VOCABULARY POOL.
-    - ENDING: The very last sentence of the final paragraph must perfectly set up these choices: {", ".join(node.branch_options)}.
+    - VOCABULARY: Weave in at least 10 words from: {", ".join(request.target_words)}.
+    - ENDING: The very last sentence of the final paragraph must perfectly set up these choices: {", ".join(node.branch_options) if node.branch_options else "THE END"}.
 
     JSON OUTPUT REQUIREMENTS:
-    1. 'scene_paragraphs': List of lists of sentences as defined above.
-    2. 'used_vocabulary': List of words used from the pool.
-    3. 'remedial_scene_text': Storytelling Hebrew translation.
-    4. 'vocabulary_definitions': Hebrew definitions for used words (List of {{"word": "...", "definition_hebrew": "..."}}).
-    5. 'assessment_tasks':
+    1. 'act_number': {node.act_number}
+    2. 'scene_paragraphs': List of lists of sentences as defined above.
+    3. 'used_vocabulary': List of words used from the pool.
+    4. 'remedial_scene_text': Storytelling Hebrew translation.
+    5. 'vocabulary_definitions': Hebrew definitions for used words (List of {{"word": "...", "definition_hebrew": "..."}}).
+    6. 'assessment_tasks':
        - 'comprehension_question': Hebrew question + 3 options + correct_option_index.
        - 'cloze_task': English sentence from your text with one word replaced by a blank + 3 options + correct_option_index.
-    6. 'story_branches': List of {{"choice_id": 1, "text_english": "...", "text_hebrew": "..."}} matching the options provided.
+    7. 'story_branches': List of {{"choice_id": 1, "text_english": "...", "text_hebrew": "..."}} matching the options provided. (Empty if level 3)
 
     Strict valid JSON matching ActContentResponse. No markdown.
     """
@@ -518,13 +532,11 @@ def apply_adventure_guardrails(data: models.AdventureSetupResponse, target_rank:
                         new_text = re.sub(rf"\b{w}\b", best_rep, new_text)
         return new_text
 
-    # Apply ONLY to labels (the 'text' field), preserving 'description'
-    for h in data.heroes:
-        h.text = simplify_text(h.text, target_rank)
-    for s in data.settings:
-        s.text = simplify_text(s.text, target_rank)
-    for c in data.catalysts:
-        c.text = simplify_text(c.text, target_rank)
+    for p in data.premises:
+        p.title = simplify_text(p.title, target_rank)
+        p.hero = simplify_text(p.hero, target_rank)
+        p.setting = simplify_text(p.setting, target_rank)
+        p.catalyst = simplify_text(p.catalyst, target_rank)
 
     return data
 

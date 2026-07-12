@@ -48,10 +48,10 @@ class AdventureSetupRequest(BaseModel):
 
 class StoryPremise(BaseModel):
     id: str
+    title: str
     hero: str
     setting: str
     catalyst: str
-    title: str
 
 class AdventureSetupResponse(BaseModel):
     premises: List[StoryPremise] = Field(default_factory=list)
@@ -60,7 +60,7 @@ class AdventureSetupResponse(BaseModel):
 class DAGNode(BaseModel):
     node_id: str
     act_number: int
-    level: int # Depth in the DAG (0-3 as requested)
+    level: int # 0 to 3
     title: str
     description: str
     plot_beats: List[str] = Field(default_factory=list)
