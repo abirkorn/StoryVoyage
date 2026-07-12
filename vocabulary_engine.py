@@ -35,7 +35,7 @@ class VocabularyEngine:
         key = os.getenv("GEMINI_API_KEY")
         if not key:
             logger.error("GEMINI_API_KEY not found!")
-        return genai.Client(api_key=key, http_options={"api_version": "v1"})
+        return genai.Client(api_key=key, http_options={"api_version": "v1beta"})
 
     def fetch_vocabulary(
         self,
@@ -74,19 +74,45 @@ class VocabularyEngine:
                 candidates = candidates[:1000]
 
         # Step B: Batch Embed
+        import time
         client = self.get_client()
         texts_to_embed = [semantic_query] + [c.w for c in candidates]
 
         try:
-            res = client.models.embed_content(
-                model="models/gemini-embedding-2",
-                contents=texts_to_embed,
-                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
-            )
-            embeddings = np.array([e.values for e in res.embeddings])
+            # The SDK requires List[Content] for proper batching of multiple texts
+            contents = [types.Content(parts=[types.Part(text=t)]) for t in texts_to_embed]
+
+            # API limit for batchEmbedContents is usually 100 requests per call
+            batch_size = 100
+            all_embeddings = []
+
+            for i in range(0, len(contents), batch_size):
+                batch = contents[i : i + batch_size]
+                # Simple retry logic for 429s
+                for attempt in range(3):
+                    try:
+                        res = client.models.embed_content(
+                            model="models/gemini-embedding-2",
+                            contents=batch,
+                            config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
+                        )
+                        if res.embeddings:
+                            all_embeddings.extend([e.values for e in res.embeddings])
+                        break # Success
+                    except Exception as exc:
+                        if "429" in str(exc) and attempt < 2:
+                            time.sleep(2 * (attempt + 1))
+                            continue
+                        raise exc
+
+            embeddings = np.array(all_embeddings)
         except Exception as e:
             logger.error(f"Embedding API call failed: {e}")
             # Fallback: Just return random from candidates if API fails
+            import random
+            return [c.w for c in random.sample(candidates, min(len(candidates), word_count))]
+
+        if embeddings.shape[0] < 2:
             import random
             return [c.w for c in random.sample(candidates, min(len(candidates), word_count))]
 
